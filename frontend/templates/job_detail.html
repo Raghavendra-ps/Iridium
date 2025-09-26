@@ -1,0 +1,131 @@
+{% extends "dashboard_base.html" %}
+
+{% block title %}Job #{{ job_id }} - Iridium{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div>
+            <h1 id="job-title" class="card-title">Loading Job Details...</h1>
+            <p id="job-subtitle" style="color: var(--color-text-muted);"></p>
+        </div>
+        <div id="job-status-badge" style="background: #eee; padding: 6px 12px; border-radius: 99px; font-size: 0.9rem; font-weight: 500;">LOADING</div>
+    </div>
+</div>
+<div class="card">
+    <h2 class="card-title">Extracted Data (Editable)</h2>
+    <div id="data-grid-container" style="width: 100%; min-height: 400px; display: flex; align-items: center; justify-content: center;">
+        <p id="grid-status">Waiting for file processing to complete...</p>
+    </div>
+    <div id="actions-bar" style="margin-top: 1.5rem; display: none; justify-content: space-between; align-items: center;">
+        <div id="action-status" style="font-size: 0.9rem;"></div>
+        <div style="display: flex; gap: 1rem;">
+            <button id="saveChangesBtn" class="btn">Save Changes</button>
+            <button id="processBtn" class="btn" style="background-color: var(--color-accent); color: white;">Process and Send to ERPNext</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// This function is defined here and will be called by the script in dashboard_base.html
+function onPageLoad(token) {
+    const jobId = {{ job_id }};
+
+    const jobTitle = document.getElementById('job-title');
+    const jobSubtitle = document.getElementById('job-subtitle');
+    const jobStatusBadge = document.getElementById('job-status-badge');
+    const gridContainer = document.getElementById('data-grid-container');
+    const gridStatus = document.getElementById('grid-status');
+    const actionsBar = document.getElementById('actions-bar');
+    const saveChangesBtn = document.getElementById('saveChangesBtn');
+    const processBtn = document.getElementById('processBtn');
+
+    let hot; // To hold the Handsontable instance
+    let pollingInterval;
+
+    async function pollJobStatus() {
+        try {
+            const response = await fetch(`/api/v1/conversions/${jobId}/status`, { headers: { 'Authorization': `Bearer ${token}` } });
+            if (!response.ok) {
+                clearInterval(pollingInterval);
+                const errorData = await response.json();
+                gridStatus.textContent = `Error fetching status: ${errorData.detail || 'Request failed'}`;
+                gridStatus.style.color = 'red';
+                return;
+            }
+            const job = await response.json();
+
+            jobTitle.textContent = `Job #${job.id}: ${job.original_filename}`;
+            jobSubtitle.textContent = `Target Doctype: ${job.target_doctype}`;
+            jobStatusBadge.textContent = job.status;
+
+            if (job.status === 'AWAITING_VALIDATION') {
+                clearInterval(pollingInterval);
+                jobStatusBadge.style.backgroundColor = '#dbeafe';
+                fetchAndRenderData();
+            } else if (job.status === 'EXTRACTION_FAILED') {
+                clearInterval(pollingInterval);
+                jobStatusBadge.style.backgroundColor = '#fecaca';
+                const errorMessage = job.error_log ? JSON.stringify(job.error_log) : 'Unknown error.';
+                gridStatus.textContent = `File processing failed: ${errorMessage}`;
+                gridStatus.style.color = 'red';
+            }
+        } catch (error) {
+            console.error("Polling error:", error);
+            clearInterval(pollingInterval);
+            gridStatus.textContent = 'Error connecting to server to check status.';
+            gridStatus.style.color = 'red';
+        }
+    }
+
+    async function fetchAndRenderData() {
+        gridStatus.textContent = 'Loading extracted data...';
+        try {
+            const response = await fetch(`/api/v1/conversions/${jobId}/data`, { headers: { 'Authorization': `Bearer ${token}` } });
+            if (!response.ok) throw new Error('Could not load processed data from the server.');
+            const data = await response.json();
+
+            gridContainer.innerHTML = '';
+            gridContainer.style.minHeight = '600px';
+
+            if (!Array.isArray(data) || data.length === 0) {
+                 gridStatus.textContent = 'Processing complete, but no data was extracted from the file.';
+                 return;
+            }
+
+            hot = new Handsontable(gridContainer, {
+                data: data,
+                rowHeaders: true,
+                colHeaders: Object.keys(data[0]),
+                licenseKey: 'non-commercial-and-evaluation',
+                width: '100%',
+                height: 'auto',
+                stretchH: 'all',
+                manualColumnResize: true,
+                manualRowResize: true,
+                contextMenu: true,
+                dropdownMenu: true,
+                filters: true,
+            });
+
+            actionsBar.style.display = 'flex';
+            bindActionButtons();
+        } catch (error) {
+            gridStatus.textContent = `Error rendering data: ${error.message}`;
+            gridStatus.style.color = 'red';
+        }
+    }
+
+    function bindActionButtons() {
+        saveChangesBtn.addEventListener('click', () => { console.log('Save Changes Clicked'); });
+        processBtn.addEventListener('click', () => { console.log('Process and Send Clicked'); });
+    }
+
+    // Start the polling process for this page
+    pollJobStatus();
+    pollingInterval = setInterval(pollJobStatus, 3000);
+}
+</script>
+{% endblock %}

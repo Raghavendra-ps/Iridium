@@ -35,12 +35,12 @@ services:
         build:
             context: .
             dockerfile: Dockerfile.app
-        command: gunicorn --bind 0.0.0.0:8000 -w 4 -k uvicorn.workers.UvicornWorker app.main:app
+        command: >
+            sh -c "chown -R appuser:appuser /app/uploads &&
+                   gunicorn --bind 0.0.0.0:8000 -w 4 -k uvicorn.workers.UvicornWorker --user appuser --group appuser app.main:app"
         volumes:
-            # Mount only the application code for live reloading.
-            # This prevents overwriting the .venv directory.
             - ./app:/app/app
-            # Mount alembic files if they exist, for migration management.
+            - ./frontend:/app/frontend
             - ./alembic:/app/alembic
             - ./alembic.ini:/app/alembic.ini
             - uploaded_files:/app/uploads
@@ -57,13 +57,12 @@ services:
     worker:
         build:
             context: .
-            dockerfile: Dockerfile.app
+            # --- THIS IS THE KEY CHANGE ---
+            dockerfile: Dockerfile.worker
+        # The command is now simple because the environment is clean
         command: celery -A app.infrastructure.celery_app.celery worker --loglevel=info
         volumes:
-            # Mount the same specific directories for the worker.
             - ./app:/app/app
-            - ./alembic:/app/alembic
-            - ./alembic.ini:/app/alembic.ini
             - uploaded_files:/app/uploads
         env_file:
             - ./.env

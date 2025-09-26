@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Iridium</title>
+    <style>
+        body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #f0f2f5; }
+        .login-container { background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); width: 300px; }
+        h1 { text-align: center; color: #333; }
+        .form-group { margin-bottom: 1rem; }
+        label { display: block; margin-bottom: 0.5rem; color: #555; }
+        input { width: 100%; padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        button { width: 100%; padding: 0.75rem; border: none; border-radius: 4px; background-color: #007bff; color: white; font-size: 1rem; cursor: pointer; }
+        button:hover { background-color: #0056b3; }
+        .status { margin-top: 1rem; text-align: center; font-size: 0.9rem; }
+        .error { color: red; }
+        .success { color: green; }
+        .register-link { text-align: center; margin-top: 1.5rem; font-size: 0.9rem; color: #555; }
+        .register-link a { color: #007bff; text-decoration: none; }
+        .register-link a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <h1>Iridium</h1>
+        <p id="status-message" class="status"></p>
+        <form id="loginForm">
+            <div class="form-group">
+                <label for="username">Email</label>
+                <input type="email" id="username" name="username" required>
+            </div>
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" required>
+            </div>
+            <button type="submit">Login</button>
+        </form>
+        <div class="register-link">
+            Don't have an account? <a href="/register">Sign Up</a>
+        </div>
+    </div>
+
+    <script>
+        // Check for registration success message in URL
+        document.addEventListener('DOMContentLoaded', () => {
+            const params = new URLSearchParams(window.location.search);
+            if (params.get('registered') === 'true') {
+                const statusMessage = document.getElementById('status-message');
+                statusMessage.textContent = 'Registration successful! Please log in.';
+                statusMessage.classList.add('success');
+            }
+        });
+
+        document.getElementById('loginForm').addEventListener('submit', async function(event) {
+            event.preventDefault();
+            const form = event.target;
+            const formData = new FormData(form);
+            const statusMessage = document.getElementById('status-message');
+            statusMessage.textContent = '';
+            statusMessage.className = 'status'; // Reset classes
+
+            const data = new URLSearchParams();
+            data.append('username', form.username.value);
+            data.append('password', form.password.value);
+
+            const urlEncodedData = new URLSearchParams(formData);
+
+            try {
+                const response = await fetch('/api/v1/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded', },
+                    body: urlEncodedData
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    localStorage.setItem('access_token', data.access_token);
+                    window.location.href = '/home';
+                } else {
+                    const errorData = await response.json();
+                    statusMessage.textContent = errorData.detail || 'Login failed. Please try again.';
+                    statusMessage.classList.add('error');
+                }
+            } catch (error) {
+                statusMessage.textContent = 'An error occurred. Please try again later.';
+                statusMessage.classList.add('error');
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,3 +1,5 @@
+# This Dockerfile is ONLY for the Celery worker.
+
 # Stage 1: Builder stage
 FROM python:3.10-slim-bullseye AS builder
 ENV PYTHONDONTWRITEBYTECODE 1
@@ -27,10 +29,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR $APP_HOME
 
-COPY --from=builder /app/.venv/ ./.venv/
-COPY ./app ./app
-RUN chown -R appuser:appuser $APP_HOME
+COPY --from=builder --chown=appuser:appuser /app/.venv/ ./.venv/
+COPY --chown=appuser:appuser ./app ./app
 
 ENV PATH="$APP_HOME/.venv/bin:$PATH"
 
-EXPOSE 8000
+USER appuser

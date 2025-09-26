@@ -4,7 +4,9 @@ from redis import Redis
 import logging
 
 from app.core.config import settings
-from app.db.session import SessionLocal
+from app.db.session import SessionLocal, get_db
+# --- Ensure ALL routers are imported with correct names ---
+from app.api.endpoints import auth, users, pages, conversions, organizations
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -16,14 +18,6 @@ app = FastAPI(
     openapi_url=f"{settings.API_V1_STR}/openapi.json"
 )
 
-# --- Dependency for Database Session ---
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
 # --- Dependency for Redis Connection ---
 def get_redis():
     try:
@@ -34,7 +28,7 @@ def get_redis():
         logger.error(f"Could not connect to Redis: {e}")
         raise HTTPException(status_code=503, detail="Could not connect to Redis.")
 
-# --- Health Check Endpoint ---
+# --- Endpoints defined in main.py ---
 @app.get("/health", tags=["Health"])
 def health_check(
     db: Session = Depends(get_db),
@@ -47,11 +41,19 @@ def health_check(
         logger.error(f"Database connection failed: {e}")
         db_status = "error"
         raise HTTPException(status_code=503, detail="Database connection error.")
-
     redis_status = "ok"
     return {"status": "ok", "dependencies": {"database": db_status, "redis": redis_status}}
 
-# A simple root endpoint
 @app.get("/", tags=["Root"])
 def read_root():
     return {"message": "Welcome to Iridium"}
+
+# --- Include API Routers from other files ---
+app.include_router(auth.router, prefix=f"{settings.API_V1_STR}/auth", tags=["auth"])
+app.include_router(users.router, prefix=f"{settings.API_V1_STR}/users", tags=["users"])
+app.include_router(conversions.router, prefix=f"{settings.API_V1_STR}/conversions", tags=["conversions"])
+# This now uses the correct variable name 'organizations'
+app.include_router(organizations.router, prefix=f"{settings.API_V1_STR}/linked-organizations", tags=["organizations"])
+
+# --- Include Page Routers ---
+app.include_router(pages.router, tags=["pages"])

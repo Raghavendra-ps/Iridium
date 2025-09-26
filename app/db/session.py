@@ -12,3 +12,11 @@ SessionLocal = sessionmaker(
     autoflush=False,
     bind=engine
 )
+
+# --- Dependency for Database Session ---
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()

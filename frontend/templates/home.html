@@ -1,0 +1,23 @@
+{% extends "dashboard_base.html" %}
+
+{% block title %}Dashboard - Iridium{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1 class="card-title">Dashboard Overview</h1>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem;">
+        <div style="border: 1px solid var(--color-border); padding: 1.5rem; border-radius: var(--radius-lg);">
+            <div style="font-size: 2.5rem; font-weight: 700; color: var(--color-primary);">12</div>
+            <div style="color: var(--color-text-muted); margin-top: 0.5rem;">Jobs Completed (24h)</div>
+        </div>
+        <div style="border: 1px solid var(--color-border); padding: 1.5rem; border-radius: var(--radius-lg);">
+            <div style="font-size: 2.5rem; font-weight: 700; color: var(--color-primary);">3</div>
+            <div style="color: var(--color-text-muted); margin-top: 0.5rem;">Jobs Pending Validation</div>
+        </div>
+        <div style="border: 1px solid var(--color-border); padding: 1.5rem; border-radius: var(--radius-lg);">
+            <div style="font-size: 2.5rem; font-weight: 700; color: var(--color-primary);">1.2 GB</div>
+            <div style="color: var(--color-text-muted); margin-top: 0.5rem;">Data Processed</div>
+        </div>
+    </div>
+</div>
+{% endblock %}

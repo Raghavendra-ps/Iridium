@@ -36,6 +36,18 @@ class Settings(BaseSettings):
             port=str(self.REDIS_PORT),
         ))
 
+    # --- Celery Settings ---
+    # These MUST be defined at the class level, not inside a function.
+    # We are reusing the REDIS_URI property we defined above.
+    @property
+    def CELERY_BROKER_URL(self) -> str:
+        return self.REDIS_URI
+
+    @property
+    def CELERY_RESULT_BACKEND(self) -> str:
+        return self.REDIS_URI
+
+
     class Config:
         case_sensitive = True
         env_file = ".env"

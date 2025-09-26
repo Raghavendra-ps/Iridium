@@ -1,0 +1,115 @@
+{% extends "dashboard_base.html" %}
+
+{% block title %}New Conversion - Iridium{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1 class="card-title">New Data Conversion</h1>
+    <p style="margin-bottom: 1.5rem; color: var(--color-text-muted);">
+        Select a target organization, specify the ERPNext Doctype, and upload your source file.
+    </p>
+    <form id="uploadForm" style="display: flex; flex-direction: column; gap: 1.5rem;">
+
+        <div class="form-group">
+            <label for="target_org_id" style="display:block; margin-bottom: 8px; font-weight: 500;">Target Organization</label>
+            <select id="target_org_id" name="target_org_id" required style="width: 100%; padding: 10px; border: 1px solid var(--color-border); border-radius: 8px; background-color: white;">
+                <option value="">Loading organizations...</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="doctype" style="display:block; margin-bottom: 8px; font-weight: 500;">Target ERPNext Doctype</label>
+            <input type="text" id="doctype" name="doctype" required placeholder="e.g., Sales Invoice, Customer" style="width: 100%; padding: 10px; border: 1px solid var(--color-border); border-radius: 8px;">
+        </div>
+
+        <div class="form-group">
+             <label for="fileInput" style="display:block; margin-bottom: 8px; font-weight: 500;">Source File</label>
+            <input type="file" id="fileInput" name="file" required style="width: 100%; padding: 10px; border: 1px solid var(--color-border); border-radius: 8px;">
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; align-items: center; gap: 1rem;">
+            <div id="statusMessage" style="font-size: 0.9rem;"></div>
+            <button type="submit" class="btn" style="background-color: var(--color-accent); color: white;">Upload and Begin</button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+    const token = localStorage.getItem('access_token');
+    const orgSelect = document.getElementById('target_org_id');
+
+    async function loadOrganizations() {
+        try {
+            const response = await fetch('/api/v1/linked-organizations/', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!response.ok) throw new Error('Failed to fetch organizations');
+            const orgs = await response.json();
+
+            orgSelect.innerHTML = '<option value="">-- Select a Target --</option>';
+            if(orgs.length === 0) {
+                 orgSelect.innerHTML = '<option value="">No organizations configured. Please go to Settings.</option>';
+                 orgSelect.disabled = true;
+            } else {
+                orgs.forEach(org => {
+                    const option = new Option(`${org.instance_name} (${org.organization_id})`, org.id);
+                    orgSelect.add(option);
+                });
+            }
+        } catch (error) {
+            orgSelect.innerHTML = `<option value="">Error loading organizations</option>`;
+        }
+    }
+
+    loadOrganizations();
+
+    document.getElementById('uploadForm').addEventListener('submit', async function(event) {
+        event.preventDefault();
+        const form = event.target;
+        const statusMessage = document.getElementById('statusMessage');
+        const submitButton = form.querySelector('button[type="submit"]');
+
+        if (form.file.files.length === 0 || !form.doctype.value || !form.target_org_id.value) {
+            showStatus('Please fill out all fields.', 'error');
+            return;
+        }
+
+        const formData = new FormData(form);
+
+        submitButton.disabled = true;
+        submitButton.textContent = 'Uploading...';
+        showStatus('Uploading, please wait...', 'info');
+
+        try {
+            const response = await fetch('/api/v1/conversions/upload', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` },
+                body: formData
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                // This now correctly uses 'data.id' from the real job object
+                window.location.href = `/jobs/${data.id}`;
+            } else {
+                showStatus(data.detail || 'Upload failed.', 'error');
+            }
+        } catch (error) {
+            showStatus('Failed to connect to the server.', 'error');
+        } finally {
+            submitButton.disabled = false;
+            submitButton.textContent = 'Upload and Begin';
+        }
+    });
+
+    function showStatus(message, type) {
+        statusMessage.textContent = message;
+        statusMessage.style.color = type === 'error' ? 'red' : (type === 'success' ? 'green' : 'black');
+    }
+});
+</script>
+{% endblock %}
