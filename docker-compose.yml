@@ -1,3 +1,5 @@
+# Iridium-main/docker-compose.yml
+
 services:
     db:
         image: postgres:15-alpine
@@ -35,14 +37,10 @@ services:
         build:
             context: .
             dockerfile: Dockerfile.app
-        command: >
-            sh -c "chown -R appuser:appuser /app/uploads &&
-                   gunicorn --bind 0.0.0.0:8000 -w 4 -k uvicorn.workers.UvicornWorker --user appuser --group appuser app.main:app"
+        # Revert to a simple command structure. We will add live-reloading later.
+        command: gunicorn --bind 0.0.0.0:8000 -w 4 -k uvicorn.workers.UvicornWorker --user appuser --group appuser app.main:app
+        # Remove all code mounts for now to guarantee the image is self-contained.
         volumes:
-            - ./app:/app/app
-            - ./frontend:/app/frontend
-            - ./alembic:/app/alembic
-            - ./alembic.ini:/app/alembic.ini
             - uploaded_files:/app/uploads
         ports:
             - "8088:8000"
@@ -57,12 +55,11 @@ services:
     worker:
         build:
             context: .
-            # --- THIS IS THE KEY CHANGE ---
             dockerfile: Dockerfile.worker
-        # The command is now simple because the environment is clean
+        # Revert to your original, working command.
         command: celery -A app.infrastructure.celery_app.celery worker --loglevel=info
+        # Remove all code mounts for now.
         volumes:
-            - ./app:/app/app
             - uploaded_files:/app/uploads
         env_file:
             - ./.env

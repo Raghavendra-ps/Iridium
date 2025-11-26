@@ -1,3 +1,5 @@
+# Iridium-main/Dockerfile.app
+
 # Stage 1: Builder stage
 FROM python:3.10-slim-bullseye AS builder
 ENV PYTHONDONTWRITEBYTECODE 1
@@ -16,21 +18,23 @@ FROM python:3.10-slim-bullseye AS production
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
 ENV APP_HOME="/app"
-
 RUN groupadd -g 1000 appuser && useradd -u 1000 -g 1000 -m -s /bin/bash appuser
-
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq-dev \
     tesseract-ocr \
     tesseract-ocr-eng \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
-
 WORKDIR $APP_HOME
 
+# Copy the virtual environment from the builder
 COPY --from=builder /app/.venv/ ./.venv/
-COPY ./app ./app
+
+# --- THE ACTUAL FIX ---
+# Copy the ENTIRE application context into the image.
+# This includes app/, alembic/, frontend/, alembic.ini, etc.
+COPY . .
+
 RUN chown -R appuser:appuser $APP_HOME
-
 ENV PATH="$APP_HOME/.venv/bin:$PATH"
-
 EXPOSE 8000
+# CMD is now in docker-compose.yml

@@ -1,12 +1,28 @@
-from fastapi import FastAPI, Depends, HTTPException
-from sqlalchemy.orm import Session
-from redis import Redis
+# Iridium-main/app/main.py
+
 import logging
 
+from fastapi import Depends, FastAPI, HTTPException
+from fastapi.responses import RedirectResponse
+from redis import Redis
+from sqlalchemy.orm import Session
+
+from app.api.endpoints import auth, conversions, organizations, pages, users
+
+# --- END: New imports ---
 from app.core.config import settings
-from app.db.session import SessionLocal, get_db
-# --- Ensure ALL routers are imported with correct names ---
-from app.api.endpoints import auth, users, pages, conversions, organizations
+
+# --- START: New imports for automatic table creation ---
+from app.db.base import Base
+from app.db.session import engine, get_db
+
+# --- START: Automatic Table Creation ---
+# This line tells SQLAlchemy to create all tables based on the models
+# it knows about (via the Base object). It will only create tables
+# that do not already exist, so it's safe to run on every startup.
+Base.metadata.create_all(bind=engine)
+# --- END: Automatic Table Creation ---
+
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -15,8 +31,9 @@ logger = logging.getLogger(__name__)
 # Initialize FastAPI app
 app = FastAPI(
     title="Iridium - Data Conversion Service",
-    openapi_url=f"{settings.API_V1_STR}/openapi.json"
+    openapi_url=f"{settings.API_V1_STR}/openapi.json",
 )
+
 
 # --- Dependency for Redis Connection ---
 def get_redis():
@@ -28,12 +45,10 @@ def get_redis():
         logger.error(f"Could not connect to Redis: {e}")
         raise HTTPException(status_code=503, detail="Could not connect to Redis.")
 
-# --- Endpoints defined in main.py ---
+
+# --- Health Check Endpoint ---
 @app.get("/health", tags=["Health"])
-def health_check(
-    db: Session = Depends(get_db),
-    redis: Redis = Depends(get_redis)
-):
+def health_check(db: Session = Depends(get_db), redis: Redis = Depends(get_redis)):
     try:
         db.execute("SELECT 1")
         db_status = "ok"
@@ -41,19 +56,33 @@ def health_check(
         logger.error(f"Database connection failed: {e}")
         db_status = "error"
         raise HTTPException(status_code=503, detail="Database connection error.")
+
     redis_status = "ok"
-    return {"status": "ok", "dependencies": {"database": db_status, "redis": redis_status}}
+    return {
+        "status": "ok",
+        "dependencies": {"database": db_status, "redis": redis_status},
+    }
 
-@app.get("/", tags=["Root"])
+
+# --- Root Redirect ---
+@app.get("/", tags=["Root"], include_in_schema=False)
 def read_root():
-    return {"message": "Welcome to Iridium"}
+    return RedirectResponse(url="/home")
 
-# --- Include API Routers from other files ---
+
+# --- Include API Routers ---
 app.include_router(auth.router, prefix=f"{settings.API_V1_STR}/auth", tags=["auth"])
 app.include_router(users.router, prefix=f"{settings.API_V1_STR}/users", tags=["users"])
-app.include_router(conversions.router, prefix=f"{settings.API_V1_STR}/conversions", tags=["conversions"])
-# This now uses the correct variable name 'organizations'
-app.include_router(organizations.router, prefix=f"{settings.API_V1_STR}/linked-organizations", tags=["organizations"])
+app.include_router(
+    conversions.router,
+    prefix=f"{settings.API_V1_STR}/conversions",
+    tags=["conversions"],
+)
+app.include_router(
+    organizations.router,
+    prefix=f"{settings.API_V1_STR}/linked-organizations",
+    tags=["organizations"],
+)
 
-# --- Include Page Routers ---
+# --- Include Page Routers (HTML serving) ---
 app.include_router(pages.router, tags=["pages"])

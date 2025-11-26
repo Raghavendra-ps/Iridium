@@ -1,6 +1,11 @@
+# Iridium-main/app/core/config.py
+
 import os
-from pydantic import BaseSettings, PostgresDsn, RedisDsn
 from typing import Optional
+from urllib.parse import quote_plus
+
+from pydantic import BaseSettings, PostgresDsn, RedisDsn
+
 
 class Settings(BaseSettings):
     # --- Application Settings ---
@@ -16,13 +21,17 @@ class Settings(BaseSettings):
 
     @property
     def SQLALCHEMY_DATABASE_URI(self) -> str:
-        return str(PostgresDsn.build(
-            scheme="postgresql",
-            user=self.POSTGRES_USER,
-            password=self.POSTGRES_PASSWORD,
-            host=self.POSTGRES_SERVER,
-            path=f"/{self.POSTGRES_DB or ''}",
-        ))
+        # URL-encode the username and password to handle special characters
+        user = quote_plus(self.POSTGRES_USER)
+        password = quote_plus(self.POSTGRES_PASSWORD)
+        server = self.POSTGRES_SERVER
+        db = self.POSTGRES_DB
+
+        # --- THE FIX ---
+        # Build the URI and then escape any '%' characters for Alembic's config parser.
+        uri = f"postgresql://{user}:{password}@{server}/{db}"
+        return uri.replace("%", "%%")
+        # --- END OF FIX ---
 
     # --- Redis Settings ---
     REDIS_HOST: str
@@ -30,15 +39,15 @@ class Settings(BaseSettings):
 
     @property
     def REDIS_URI(self) -> str:
-        return str(RedisDsn.build(
-            scheme="redis",
-            host=self.REDIS_HOST,
-            port=str(self.REDIS_PORT),
-        ))
+        return str(
+            RedisDsn.build(
+                scheme="redis",
+                host=self.REDIS_HOST,
+                port=str(self.REDIS_PORT),
+            )
+        )
 
     # --- Celery Settings ---
-    # These MUST be defined at the class level, not inside a function.
-    # We are reusing the REDIS_URI property we defined above.
     @property
     def CELERY_BROKER_URL(self) -> str:
         return self.REDIS_URI
@@ -47,9 +56,9 @@ class Settings(BaseSettings):
     def CELERY_RESULT_BACKEND(self) -> str:
         return self.REDIS_URI
 
-
     class Config:
         case_sensitive = True
         env_file = ".env"
+
 
 settings = Settings()

@@ -1,21 +1,126 @@
-{% extends "dashboard_base.html" %}
-
-{% block title %}Settings - Iridium{% endblock %}
-
-{% block content %}
+{% extends "dashboard_base.html" %} {% block title %}Settings - Iridium{%
+endblock %} {% block content %}
 <div class="card">
     <h1 class="card-title">Link New Organization</h1>
-    <p style="color: var(--color-text-muted); margin-bottom: 1.5rem;">
-        Enter an Organization ID from the Gretis Organisation Gateway (GOG) to link it to your Iridium account.
+    <p style="color: var(--color-text-muted); margin-bottom: 1.5rem">
+        Enter a GOG Organization ID and the connection details for its
+        corresponding ERPNext instance.
     </p>
-    <form id="newLinkForm" style="display: flex; gap: 1rem; align-items: flex-end;">
-        <div style="flex-grow: 1;">
-            <label for="organization_id" style="display:block; margin-bottom: 8px; font-weight: 500;">Organization ID</label>
-            <input type="text" id="organization_id" name="organization_id" placeholder="e.g., GIPL, PSIEC" required style="width: 100%; padding: 10px; border: 1px solid var(--color-border); border-radius: 8px;">
+    <form
+        id="newLinkForm"
+        style="
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+            align-items: flex-end;
+        "
+    >
+        <div class="form-group">
+            <label
+                for="organization_id"
+                style="display: block; margin-bottom: 8px; font-weight: 500"
+                >GOG Organization ID</label
+            >
+            <input
+                type="text"
+                id="organization_id"
+                name="organization_id"
+                placeholder="e.g., GIPL, PSIEC"
+                required
+                style="
+                    width: 100%;
+                    padding: 10px;
+                    border: 1px solid var(--color-border);
+                    border-radius: 8px;
+                "
+            />
         </div>
-        <button type="submit" class="btn" style="background-color: var(--color-accent); color: white;">Link Organization</button>
+        <div class="form-group">
+            <label
+                for="erpnext_url"
+                style="display: block; margin-bottom: 8px; font-weight: 500"
+                >ERPNext URL</label
+            >
+            <input
+                type="url"
+                id="erpnext_url"
+                name="erpnext_url"
+                placeholder="https://your-company.erpnext.com"
+                required
+                style="
+                    width: 100%;
+                    padding: 10px;
+                    border: 1px solid var(--color-border);
+                    border-radius: 8px;
+                "
+            />
+        </div>
+        <div class="form-group">
+            <label
+                for="api_key"
+                style="display: block; margin-bottom: 8px; font-weight: 500"
+                >API Key</label
+            >
+            <input
+                type="text"
+                id="api_key"
+                name="api_key"
+                required
+                style="
+                    width: 100%;
+                    padding: 10px;
+                    border: 1px solid var(--color-border);
+                    border-radius: 8px;
+                "
+            />
+        </div>
+        <div class="form-group">
+            <label
+                for="api_secret"
+                style="display: block; margin-bottom: 8px; font-weight: 500"
+                >API Secret</label
+            >
+            <input
+                type="password"
+                id="api_secret"
+                name="api_secret"
+                required
+                style="
+                    width: 100%;
+                    padding: 10px;
+                    border: 1px solid var(--color-border);
+                    border-radius: 8px;
+                "
+            />
+        </div>
+        <div
+            class="form-actions"
+            style="
+                grid-column: 2 / -1;
+                display: flex;
+                justify-content: flex-end;
+                align-items: center;
+                gap: 1rem;
+            "
+        >
+            <div
+                id="form-status"
+                style="
+                    font-size: 0.9rem;
+                    min-height: 1.2rem;
+                    flex-grow: 1;
+                    text-align: right;
+                "
+            ></div>
+            <button
+                type="submit"
+                class="btn"
+                style="background-color: var(--color-accent); color: white"
+            >
+                Link Organization
+            </button>
+        </div>
     </form>
-    <div id="form-status" style="font-size: 0.9rem; padding-top: 1rem; min-height: 1.2rem;"></div>
 </div>
 
 <div class="card">
@@ -24,161 +129,218 @@
         <p>Loading...</p>
     </div>
 </div>
-{% endblock %}
-
-{% block scripts %}
+{% endblock %} {% block scripts %}
 <script>
-document.addEventListener('DOMContentLoaded', () => {
-    const token = localStorage.getItem('access_token');
-    const orgsList = document.getElementById('orgs-list');
-    const newLinkForm = document.getElementById('newLinkForm');
-    const formStatus = document.getElementById('form-status');
-    let pollingInterval;
+    function onPageLoad(token) {
+        const orgsList = document.getElementById("orgs-list");
+        const newLinkForm = document.getElementById("newLinkForm");
+        const formStatus = document.getElementById("form-status");
+        const submitButton = newLinkForm.querySelector('button[type="submit"]');
 
-    // A centralized function for making authenticated API calls
-    const apiCall = async (url, options = {}) => {
-        const defaultOptions = {
-            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+        let pollingInterval;
+
+        const apiCall = async (url, options = {}) => {
+            const defaultOptions = {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    "Content-Type": "application/json",
+                },
+            };
+            const response = await fetch(url, {
+                ...defaultOptions,
+                ...options,
+            });
+            if (response.status === 401) {
+                localStorage.removeItem("access_token");
+                window.location.href = "/login";
+                throw new Error("Unauthorized");
+            }
+            return response;
         };
-        const response = await fetch(url, { ...defaultOptions, ...options });
-        if (response.status === 401) {
-            window.location.href = '/login';
-            throw new Error('Unauthorized'); // Stop further execution
-        }
-        return response;
-    };
 
-    // Updates the UI for a single organization's status
-    const updateStatusUI = (linkId, data) => {
-        const indicator = document.querySelector(`[data-status-indicator="${linkId}"]`);
-        const text = document.querySelector(`[data-status-text="${linkId}"]`);
-        if (!indicator || !text) {
-            console.error(`UI elements for link ID ${linkId} not found.`);
-            return;
-        }
+        const updateStatusUI = (linkId, data) => {
+            const indicator = document.querySelector(
+                `[data-status-indicator="${linkId}"]`,
+            );
+            const text = document.querySelector(
+                `[data-status-text="${linkId}"]`,
+            );
+            if (!indicator || !text) return;
 
-        const status = data?.status || data?.erpnext_api?.status || 'unknown';
-        const details = data?.details || data?.erpnext_api?.details || 'Could not determine status.';
+            const status = data?.status || "unknown";
+            const details = data?.details || "Could not determine status.";
+            indicator.style.backgroundColor =
+                status === "online"
+                    ? "#10b981"
+                    : status === "error"
+                      ? "#ef4444"
+                      : "#64748b";
+            text.textContent = details;
+        };
 
-        indicator.style.backgroundColor = status === 'online' ? '#10b981' : (status === 'offline' || status === 'error' ? '#ef4444' : '#64748b');
-        text.textContent = details;
-    };
+        const checkStatusForLink = async (linkId) => {
+            try {
+                const response = await apiCall(
+                    `/api/v1/linked-organizations/${linkId}/status`,
+                );
+                if (!response.ok) {
+                    updateStatusUI(linkId, {
+                        status: "error",
+                        details: `API Error: ${response.status}`,
+                    });
+                    return;
+                }
+                const data = await response.json();
+                updateStatusUI(linkId, data);
+            } catch (err) {
+                updateStatusUI(linkId, {
+                    status: "error",
+                    details: "Network error during status check.",
+                });
+            }
+        };
 
-    // Fetches the status for a single link ID
-    const checkStatusForLink = async (linkId) => {
-        try {
-            const response = await apiCall(`/api/v1/linked-organizations/${linkId}/status`);
-            if (!response.ok) {
-                updateStatusUI(linkId, { status: 'error', details: `API Error: ${response.status}` });
+        const checkAllStatuses = () => {
+            document.querySelectorAll("[data-link-id]").forEach((link) => {
+                checkStatusForLink(link.dataset.linkId);
+            });
+        };
+
+        const renderOrgs = (orgs) => {
+            if (orgs.length === 0) {
+                orgsList.innerHTML = `<p style="color: var(--color-text-muted);">No organizations have been linked yet.</p>`;
                 return;
             }
-            const data = await response.json();
-            updateStatusUI(linkId, data);
-        } catch (err) {
-            console.error(`Failed to get status for link ID ${linkId}:`, err);
-            updateStatusUI(linkId, { status: 'error', details: 'Network error during status check.' });
-        }
-    };
 
-    // Kicks off the status check for all visible organizations
-    const checkAllStatuses = () => {
-        const links = document.querySelectorAll('[data-link-id]');
-        links.forEach(link => {
-            checkStatusForLink(link.dataset.linkId);
-        });
-    };
-
-    // Renders the list of organizations from an array of data
-    const renderOrgs = (orgs) => {
-        if (orgs.length === 0) {
-            orgsList.innerHTML = `<p style="color: var(--color-text-muted);">No organizations have been linked yet.</p>`;
-            return;
-        }
-
-        let html = '<div style="display: flex; flex-direction: column; gap: 1rem;">';
-        orgs.forEach(org => {
-            html += `
-                <div class="org-card" data-link-id="${org.id}">
-                    <div>
-                        <strong>${org.instance_name}</strong>
-                        <p class="org-id">ID: ${org.organization_id}</p>
-                        <div class="status-line">
-                            <span class="status-indicator" data-status-indicator="${org.id}"></span>
-                            <span class="status-text" data-status-text="${org.id}">Checking...</span>
-                        </div>
+            orgsList.innerHTML =
+                '<div style="display: flex; flex-direction: column; gap: 1rem;">' +
+                orgs
+                    .map(
+                        (org) => `
+            <div class="org-card" data-link-id="${org.id}">
+                <div>
+                    <strong>${org.instance_name}</strong>
+                    <p class="org-id">ERPNext URL: ${org.erpnext_url}</p>
+                    <div class="status-line">
+                        <span class="status-indicator" data-status-indicator="${org.id}"></span>
+                        <span class="status-text" data-status-text="${org.id}">Checking GOG Status...</span>
                     </div>
-                    <button class="btn btn-danger" onclick="deleteLink(${org.id})">Delete</button>
-                </div>`;
+                </div>
+                <button class="btn btn-danger" onclick="deleteLink(${org.id})">Delete</button>
+            </div>`,
+                    )
+                    .join("") +
+                "</div>";
+
+            checkAllStatuses();
+            if (pollingInterval) clearInterval(pollingInterval);
+            pollingInterval = setInterval(checkAllStatuses, 30000);
+        };
+
+        const fetchAndRenderOrgs = async () => {
+            try {
+                const response = await apiCall("/api/v1/linked-organizations/");
+                if (!response.ok)
+                    throw new Error("Failed to fetch organizations");
+                const orgs = await response.json();
+                renderOrgs(orgs);
+            } catch (error) {
+                orgsList.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+            }
+        };
+
+        newLinkForm.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            formStatus.textContent = "Validating and linking...";
+            formStatus.style.color = "var(--color-text-muted)";
+            submitButton.disabled = true;
+            submitButton.textContent = "Linking...";
+
+            const formData = new FormData(newLinkForm);
+            const data = Object.fromEntries(formData.entries());
+
+            try {
+                const response = await apiCall(
+                    "/api/v1/linked-organizations/",
+                    {
+                        method: "POST",
+                        body: JSON.stringify(data),
+                    },
+                );
+
+                // --- START: NEW ROBUST ERROR HANDLING ---
+                if (!response.ok) {
+                    // Read the response body as text ONCE. This is safe.
+                    const errorText = await response.text();
+                    let errorDetail = errorText; // Default to the raw text
+
+                    // Now, TRY to parse the text as JSON to get a cleaner message.
+                    try {
+                        const errorData = JSON.parse(errorText);
+                        // If parsing succeeds, use the 'detail' field if it exists.
+                        errorDetail =
+                            errorData.detail || JSON.stringify(errorData);
+                    } catch (jsonError) {
+                        // If parsing fails, we don't care. We already have the raw text.
+                    }
+                    // Throw the cleanest error message we could find.
+                    throw new Error(errorDetail);
+                }
+                // --- END: NEW ROBUST ERROR HANDLING ---
+
+                // If we get here, the response was successful (2xx status code).
+                const responseData = await response.json();
+
+                newLinkForm.reset();
+                formStatus.style.color = "green";
+                formStatus.textContent = `Successfully linked "${responseData.organization_id}"!`;
+                setTimeout(() => (formStatus.textContent = ""), 4000);
+                fetchAndRenderOrgs();
+            } catch (error) {
+                formStatus.style.color = "red";
+                // This will now display either the clean JSON error or the raw HTML/text error.
+                formStatus.innerHTML = `<details><summary>Error:</summary><pre style="white-space: pre-wrap; text-align: left;">${error.message}</pre></details>`;
+            } finally {
+                submitButton.disabled = false;
+                submitButton.textContent = "Link Organization";
+            }
         });
-        html += '</div>';
-        orgsList.innerHTML = html;
 
-        checkAllStatuses(); // Initial status check
-        if (pollingInterval) clearInterval(pollingInterval);
-        pollingInterval = setInterval(checkAllStatuses, 30000); // Poll every 30 seconds
-    };
+        window.deleteLink = async (linkId) => {
+            if (!confirm("Are you sure you want to unlink this organization?"))
+                return;
+            try {
+                const response = await apiCall(
+                    `/api/v1/linked-organizations/${linkId}`,
+                    { method: "DELETE" },
+                );
+                if (!response.ok) throw new Error("Failed to delete link.");
+                fetchAndRenderOrgs();
+            } catch (error) {
+                alert(`Error: ${error.message}`);
+            }
+        };
 
-    // The main function to fetch the list of orgs and start the rendering process
-    const fetchAndRenderOrgs = async () => {
-        try {
-            const response = await apiCall('/api/v1/linked-organizations/');
-            if (!response.ok) throw new Error('Failed to fetch organizations');
-            const orgs = await response.json();
-            renderOrgs(orgs);
-        } catch (error) {
-            orgsList.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
-        }
-    };
-
-    // Event listener for the "Link Organization" form
-    newLinkForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        formStatus.textContent = 'Validating and linking...';
-        formStatus.style.color = 'var(--color-text-muted)';
-        const orgId = document.getElementById('organization_id').value;
-
-        try {
-            const response = await apiCall('/api/v1/linked-organizations/', {
-                method: 'POST',
-                body: JSON.stringify({ organization_id: orgId })
-            });
-            const data = await response.json();
-            if (!response.ok) throw new Error(data.detail || 'Failed to link organization.');
-
-            newLinkForm.reset();
-            formStatus.style.color = 'green';
-            formStatus.textContent = `Successfully linked "${data.organization_id}"!`;
-            setTimeout(() => formStatus.textContent = '', 3000);
-            fetchAndRenderOrgs();
-        } catch (error) {
-            formStatus.style.color = 'red';
-            formStatus.textContent = `Error: ${error.message}`;
-        }
-    });
-
-    // Make the delete function available globally for the inline onclick handler
-    window.deleteLink = async (linkId) => {
-        if (!confirm('Are you sure you want to unlink this organization?')) return;
-        try {
-            const response = await apiCall(`/api/v1/linked-organizations/${linkId}`, { method: 'DELETE' });
-            if (!response.ok) throw new Error('Failed to delete link.');
-            fetchAndRenderOrgs();
-        } catch (error) { alert(error.message); }
-    };
-
-    // Initial load of organizations when the page is ready
-    fetchAndRenderOrgs();
-
-    // Add some extra styles for this page dynamically
-    const style = document.createElement('style');
-    style.textContent = `
+        // Initial load and dynamic styles
+        fetchAndRenderOrgs();
+        const style = document.createElement("style");
+        style.textContent = `
         .org-card { border: 1px solid var(--color-border); border-radius: 8px; padding: 1rem; display: flex; justify-content: space-between; align-items: center; }
         .org-id { color: var(--color-text-muted); font-size: 0.9rem; margin-top: 4px; }
         .status-line { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
-        .status-indicator { width: 10px; height: 10px; border-radius: 50%; background-color: #94a3b8; transition: background-color 0.3s; }
+        .status-indicator { width: 10px; height: 10px; border-radius: 50%; background-color: #94a3b8; }
         .status-text { font-size: 0.85rem; color: var(--color-text-muted); }
     `;
-    document.head.appendChild(style);
-});
+        document.head.appendChild(style);
+    }
+
+    // Ensure the onPageLoad function is called from the base template script
+    document.addEventListener("DOMContentLoaded", () => {
+        const token = localStorage.getItem("access_token");
+        // Simplified check to call onPageLoad if it exists for the current page
+        if (typeof onPageLoad === "function") {
+            onPageLoad(token);
+        }
+    });
 </script>
 {% endblock %}

@@ -1,8 +1,14 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, JSON
-from sqlalchemy.sql import func
+# Iridium-main/app/db/models.py
+
+from sqlalchemy import JSON, Boolean, Column, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
 
 from .base import Base
+
+# --- Add this import ---
+from .types import EncryptedString
+
 
 class User(Base):
     __tablename__ = "users"
@@ -13,7 +19,10 @@ class User(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     jobs = relationship("ConversionJob", back_populates="owner")
-    linked_organizations = relationship("LinkedOrganization", back_populates="owner", cascade="all, delete-orphan")
+    linked_organizations = relationship(
+        "LinkedOrganization", back_populates="owner", cascade="all, delete-orphan"
+    )
+
 
 class LinkedOrganization(Base):
     __tablename__ = "linked_organizations"
@@ -23,7 +32,17 @@ class LinkedOrganization(Base):
     organization_id = Column(String, nullable=False)
     instance_name = Column(String, nullable=False)
 
+    # --- START: New fields for ERPNext integration ---
+    erpnext_url = Column(String, nullable=False)
+    api_key = Column(String, nullable=False)
+    # This field uses our custom type to automatically encrypt the secret.
+    api_secret = Column(
+        EncryptedString(255), nullable=False
+    )  # Specify a length for the underlying String
+    # --- END: New fields ---
+
     owner = relationship("User", back_populates="linked_organizations")
+
 
 class ConversionJob(Base):
     __tablename__ = "conversion_jobs"
@@ -31,7 +50,9 @@ class ConversionJob(Base):
     owner_id = Column(Integer, ForeignKey("users.id"), nullable=False)
 
     # This links to our new table
-    target_org_id = Column(Integer, ForeignKey("linked_organizations.id"), nullable=True) # Making it nullable for now
+    target_org_id = Column(
+        Integer, ForeignKey("linked_organizations.id"), nullable=True
+    )
 
     status = Column(String, default="UPLOADED", nullable=False)
     target_doctype = Column(String, nullable=False)

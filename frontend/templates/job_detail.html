@@ -1,131 +1,272 @@
-{% extends "dashboard_base.html" %}
-
-{% block title %}Job #{{ job_id }} - Iridium{% endblock %}
-
-{% block content %}
+{% extends "dashboard_base.html" %} {% block title %}Job #{{ job_id }} -
+Iridium{% endblock %} {% block head %}
+<!-- Add Handsontable CSS and JS -->
+<link
+    rel="stylesheet"
+    href="https://cdn.jsdelivr.net/npm/handsontable@13.1.0/dist/handsontable.full.min.css"
+/>
+<script src="https://cdn.jsdelivr.net/npm/handsontable@13.1.0/dist/handsontable.full.min.js"></script>
+{% endblock %} {% block content %}
 <div class="card">
-    <div style="display: flex; justify-content: space-between; align-items: center;">
+    <div
+        style="
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        "
+    >
         <div>
             <h1 id="job-title" class="card-title">Loading Job Details...</h1>
-            <p id="job-subtitle" style="color: var(--color-text-muted);"></p>
+            <p id="job-subtitle" style="color: var(--color-text-muted)"></p>
         </div>
-        <div id="job-status-badge" style="background: #eee; padding: 6px 12px; border-radius: 99px; font-size: 0.9rem; font-weight: 500;">LOADING</div>
+        <div
+            id="job-status-badge"
+            style="
+                background: #eee;
+                padding: 6px 12px;
+                border-radius: 99px;
+                font-size: 0.9rem;
+                font-weight: 500;
+            "
+        >
+            LOADING
+        </div>
     </div>
 </div>
 <div class="card">
     <h2 class="card-title">Extracted Data (Editable)</h2>
-    <div id="data-grid-container" style="width: 100%; min-height: 400px; display: flex; align-items: center; justify-content: center;">
+    <div
+        id="data-grid-container"
+        style="
+            width: 100%;
+            min-height: 400px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid var(--color-border);
+            border-radius: 8px;
+            background: #f8fafc;
+        "
+    >
         <p id="grid-status">Waiting for file processing to complete...</p>
     </div>
-    <div id="actions-bar" style="margin-top: 1.5rem; display: none; justify-content: space-between; align-items: center;">
-        <div id="action-status" style="font-size: 0.9rem;"></div>
-        <div style="display: flex; gap: 1rem;">
-            <button id="saveChangesBtn" class="btn">Save Changes</button>
-            <button id="processBtn" class="btn" style="background-color: var(--color-accent); color: white;">Process and Send to ERPNext</button>
+    <div
+        id="actions-bar"
+        style="
+            margin-top: 1.5rem;
+            display: none;
+            justify-content: space-between;
+            align-items: center;
+        "
+    >
+        <div
+            id="action-status"
+            style="font-size: 0.9rem; color: var(--color-text-muted)"
+        ></div>
+        <div style="display: flex; gap: 1rem">
+            <button id="downloadBtn" class="btn">Download as JSON</button>
+            <button
+                id="processBtn"
+                class="btn"
+                style="background-color: var(--color-accent); color: white"
+            >
+                Process and Send to ERPNext
+            </button>
         </div>
     </div>
 </div>
-{% endblock %}
-
-{% block scripts %}
+{% endblock %} {% block scripts %}
 <script>
-// This function is defined here and will be called by the script in dashboard_base.html
-function onPageLoad(token) {
-    const jobId = {{ job_id }};
+    function onPageLoad(token) {
+        const jobId = {{ job_id }};
 
-    const jobTitle = document.getElementById('job-title');
-    const jobSubtitle = document.getElementById('job-subtitle');
-    const jobStatusBadge = document.getElementById('job-status-badge');
-    const gridContainer = document.getElementById('data-grid-container');
-    const gridStatus = document.getElementById('grid-status');
-    const actionsBar = document.getElementById('actions-bar');
-    const saveChangesBtn = document.getElementById('saveChangesBtn');
-    const processBtn = document.getElementById('processBtn');
+        const jobTitle = document.getElementById('job-title');
+        const jobSubtitle = document.getElementById('job-subtitle');
+        const jobStatusBadge = document.getElementById('job-status-badge');
+        const gridContainer = document.getElementById('data-grid-container');
+        const actionsBar = document.getElementById('actions-bar');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const processBtn = document.getElementById('processBtn');
+        const actionStatus = document.getElementById('action-status');
 
-    let hot; // To hold the Handsontable instance
-    let pollingInterval;
+        let hot;
+        let pollingInterval;
 
-    async function pollJobStatus() {
-        try {
-            const response = await fetch(`/api/v1/conversions/${jobId}/status`, { headers: { 'Authorization': `Bearer ${token}` } });
-            if (!response.ok) {
-                clearInterval(pollingInterval);
-                const errorData = await response.json();
-                gridStatus.textContent = `Error fetching status: ${errorData.detail || 'Request failed'}`;
-                gridStatus.style.color = 'red';
-                return;
+        const apiCall = async (url, options = {}) => {
+            const defaultOptions = {
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+            };
+            const response = await fetch(url, { ...defaultOptions, ...options });
+            if (response.status === 401) {
+                localStorage.removeItem('access_token');
+                window.location.href = '/login';
+                throw new Error('Unauthorized');
             }
-            const job = await response.json();
+            return response;
+        };
 
-            jobTitle.textContent = `Job #${job.id}: ${job.original_filename}`;
-            jobSubtitle.textContent = `Target Doctype: ${job.target_doctype}`;
-            jobStatusBadge.textContent = job.status;
+        async function pollJobStatus() {
+            try {
+                const response = await apiCall(`/api/v1/conversions/${jobId}/status`);
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || 'Failed to fetch job status');
+                }
+                const job = await response.json();
 
-            if (job.status === 'AWAITING_VALIDATION') {
+                jobTitle.textContent = `Job #${job.id}: ${job.original_filename}`;
+                jobSubtitle.textContent = `Target Doctype: ${job.target_doctype}`;
+                jobStatusBadge.textContent = job.status;
+
+                if (job.status === 'AWAITING_VALIDATION' || job.status === 'SUBMISSION_FAILED') {
+                    clearInterval(pollingInterval);
+                    jobStatusBadge.style.backgroundColor = job.status === 'SUBMISSION_FAILED' ? '#fecaca' : '#dbeafe';
+                    if (!hot) {
+                       fetchAndRenderData();
+                    } else {
+                        processBtn.disabled = false;
+                        processBtn.textContent = 'Process and Send to ERPNext';
+                    }
+                     if(job.status === 'SUBMISSION_FAILED' && job.error_log){
+                        actionStatus.innerHTML = `<details><summary style="color:red;">Submission failed. Click for details.</summary><pre style="white-space: pre-wrap; text-align: left; font-size: 0.8rem;">${JSON.stringify(job.error_log, null, 2)}</pre></details>`;
+                    }
+                } else if (job.status === 'EXTRACTION_FAILED') {
+                    clearInterval(pollingInterval);
+                    jobStatusBadge.style.backgroundColor = '#fecaca';
+                    const errorMessage = job.error_log ? JSON.stringify(job.error_log, null, 2) : 'Unknown error.';
+                    gridContainer.innerHTML = `<p style="color: red; text-align: left; white-space: pre-wrap;">File processing failed: ${errorMessage}</p>`;
+                } else if (job.status === 'COMPLETED') {
+                    clearInterval(pollingInterval);
+                    jobStatusBadge.style.backgroundColor = '#dcfce7';
+                    actionStatus.textContent = 'Submission completed successfully!';
+                    actionStatus.style.color = 'green';
+                    if (hot) hot.updateSettings({ readOnly: true });
+                    processBtn.disabled = true;
+                } else {
+                     jobStatusBadge.style.backgroundColor = '#eef2ff';
+                }
+            } catch (error) {
                 clearInterval(pollingInterval);
-                jobStatusBadge.style.backgroundColor = '#dbeafe';
-                fetchAndRenderData();
-            } else if (job.status === 'EXTRACTION_FAILED') {
-                clearInterval(pollingInterval);
-                jobStatusBadge.style.backgroundColor = '#fecaca';
-                const errorMessage = job.error_log ? JSON.stringify(job.error_log) : 'Unknown error.';
-                gridStatus.textContent = `File processing failed: ${errorMessage}`;
-                gridStatus.style.color = 'red';
+                gridContainer.innerHTML = `<p style="color: red;">Error polling job status: ${error.message}</p>`;
             }
-        } catch (error) {
-            console.error("Polling error:", error);
-            clearInterval(pollingInterval);
-            gridStatus.textContent = 'Error connecting to server to check status.';
-            gridStatus.style.color = 'red';
         }
-    }
 
-    async function fetchAndRenderData() {
-        gridStatus.textContent = 'Loading extracted data...';
-        try {
-            const response = await fetch(`/api/v1/conversions/${jobId}/data`, { headers: { 'Authorization': `Bearer ${token}` } });
-            if (!response.ok) throw new Error('Could not load processed data from the server.');
-            const data = await response.json();
+        async function fetchAndRenderData() {
+            gridContainer.innerHTML = `<p>Loading extracted data...</p>`;
+            try {
+                const response = await apiCall(`/api/v1/conversions/${jobId}/data`);
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`Server error when fetching data: ${errorText}`);
+                }
+                const data = await response.json();
 
-            gridContainer.innerHTML = '';
-            gridContainer.style.minHeight = '600px';
+                console.log('Received data:', data);
 
-            if (!Array.isArray(data) || data.length === 0) {
-                 gridStatus.textContent = 'Processing complete, but no data was extracted from the file.';
-                 return;
+                if (!Array.isArray(data) || data.length === 0) {
+                     gridContainer.innerHTML = `<p style="color: var(--color-text-muted);">Processing complete, but no data rows were extracted from the file.</p>`;
+                     actionsBar.style.display = 'flex';
+                     processBtn.disabled = true;
+                     bindDownloadButton(data);
+                     return;
+                }
+
+                gridContainer.innerHTML = '';
+                gridContainer.style.minHeight = '600px';
+                gridContainer.style.background = 'white';
+
+                console.log('Data received, initializing Handsontable:', data);
+
+                // Check if Handsontable is loaded
+                if (typeof Handsontable === 'undefined') {
+                    throw new Error('Handsontable library is not loaded. Check if CDN links are accessible.');
+                }
+
+                hot = new Handsontable(gridContainer, {
+                    data: data,
+                    rowHeaders: true,
+                    colHeaders: Object.keys(data[0]),
+                    licenseKey: 'non-commercial-and-evaluation',
+                    width: '100%',
+                    height: 'auto',
+                    stretchH: 'all',
+                    manualColumnResize: true,
+                    manualRowResize: true,
+                    contextMenu: true,
+                    dropdownMenu: true,
+                    filters: true,
+                    wordWrap: false,
+                    autoWrapRow: true,
+                    autoWrapCol: true,
+                });
+
+                console.log('Handsontable initialized successfully');
+
+                actionsBar.style.display = 'flex';
+                bindActionButtons();
+            } catch (error) {
+                console.error('An error occurred during fetchAndRenderData:', error);
+                gridContainer.innerHTML = `<p style="color: red;">CRITICAL ERROR: Failed to render data grid. Check the browser console (F12) for details. Error: ${error.message}</p>`;
             }
+        }
 
-            hot = new Handsontable(gridContainer, {
-                data: data,
-                rowHeaders: true,
-                colHeaders: Object.keys(data[0]),
-                licenseKey: 'non-commercial-and-evaluation',
-                width: '100%',
-                height: 'auto',
-                stretchH: 'all',
-                manualColumnResize: true,
-                manualRowResize: true,
-                contextMenu: true,
-                dropdownMenu: true,
-                filters: true,
+        function bindDownloadButton(dataToDownload) {
+             downloadBtn.addEventListener('click', () => {
+                const data = (typeof dataToDownload === 'function') ? dataToDownload() : dataToDownload;
+                const jsonData = JSON.stringify(data, null, 2);
+                const blob = new Blob([jsonData], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `job_${jobId}_edited.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
             });
-
-            actionsBar.style.display = 'flex';
-            bindActionButtons();
-        } catch (error) {
-            gridStatus.textContent = `Error rendering data: ${error.message}`;
-            gridStatus.style.color = 'red';
         }
-    }
 
-    function bindActionButtons() {
-        saveChangesBtn.addEventListener('click', () => { console.log('Save Changes Clicked'); });
-        processBtn.addEventListener('click', () => { console.log('Process and Send Clicked'); });
-    }
+        function bindActionButtons() {
+            bindDownloadButton(() => hot.getSourceData());
 
-    // Start the polling process for this page
-    pollJobStatus();
-    pollingInterval = setInterval(pollJobStatus, 3000);
-}
+            processBtn.addEventListener('click', async () => {
+                if (!confirm('Are you sure you want to submit this data to ERPNext? This action cannot be undone.')) {
+                    return;
+                }
+                actionStatus.textContent = 'Submitting...';
+                actionStatus.style.color = 'black';
+                processBtn.disabled = true;
+                processBtn.textContent = 'Submitting...';
+
+                const editedData = hot.getSourceData();
+
+                try {
+                    const response = await apiCall(`/api/v1/conversions/${jobId}/submit`, {
+                        method: 'POST',
+                        body: JSON.stringify({ data: editedData })
+                    });
+
+                    if (response.status !== 202) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.detail || 'Submission request failed.');
+                    }
+
+                    actionStatus.textContent = 'Submission accepted. Processing in background...';
+                    actionStatus.style.color = 'green';
+                    if (pollingInterval) clearInterval(pollingInterval);
+                    pollingInterval = setInterval(pollJobStatus, 3000);
+
+                } catch (error) {
+                    actionStatus.textContent = `Error: ${error.message}`;
+                    actionStatus.style.color = 'red';
+                    processBtn.disabled = false;
+                    processBtn.textContent = 'Process and Send to ERPNext';
+                }
+            });
+        }
+
+        pollJobStatus();
+        pollingInterval = setInterval(pollJobStatus, 3000);
+    }
 </script>
 {% endblock %}

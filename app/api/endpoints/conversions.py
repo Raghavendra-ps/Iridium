@@ -1,10 +1,14 @@
+# Iridium-main/app/api/endpoints/conversions.py
+
 import uuid
 from pathlib import Path
 import json
+from typing import List, Dict, Any
 
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, status, Form
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from sqlalchemy.orm import Session
+from pydantic import BaseModel
 
 from app.api import dependencies
 from app.db.models import User
@@ -15,6 +19,10 @@ from app.infrastructure import tasks
 
 router = APIRouter()
 UPLOAD_DIR = Path("/app/uploads")
+
+class JobDataSubmission(BaseModel):
+    data: List[Dict[str, Any]]
+
 
 @router.get("/", response_model=list[dict])
 def list_jobs(
@@ -100,6 +108,51 @@ def get_job_data(
 
     return FileResponse(job.intermediate_data_path, media_type="application/json")
 
+
+@router.post("/{job_id}/submit", status_code=status.HTTP_202_ACCEPTED)
+def submit_job_for_processing(
+    *,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(dependencies.get_current_user),
+    job_id: int,
+    submission_data: JobDataSubmission
+):
+    """
+    Receives user-validated data, saves it, and dispatches the ERPNext submission task.
+    """
+    job = job_service.get_job_by_id(db=db, job_id=job_id, owner_id=current_user.id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    if job.status not in ["AWAITING_VALIDATION", "SUBMISSION_FAILED"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Job is not in a submittable state. Current status: {job.status}"
+        )
+
+    if not job.intermediate_data_path:
+        raise HTTPException(status_code=404, detail="Intermediate data path not set. The job may not have been processed yet.")
+        
+    validated_data_path = Path(job.intermediate_data_path)
+    try:
+        with open(validated_data_path, 'w', encoding='utf-8') as f:
+            json.dump(submission_data.data, f, indent=2, ensure_ascii=False)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to save validated data: {e}"
+        )
+
+    job.status = "PENDING_SUBMISSION"
+    db.commit()
+
+    tasks.submit_to_erpnext_task.delay(job.id)
+
+    return JSONResponse(
+        content={"message": "Job submission accepted and is being processed in the background."}
+    )
+
+
 @router.delete("/{job_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_job(
     *,
@@ -110,30 +163,22 @@ def delete_job(
     """
     Delete a conversion job and its associated files.
     """
-    # First, get the job and verify ownership
     job = job_service.get_job_by_id(db=db, job_id=job_id, owner_id=current_user.id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
-    # Delete associated files from the disk
     try:
-        # Delete the original uploaded file
         original_file = UPLOAD_DIR / job.storage_filename
         if original_file.exists():
             original_file.unlink()
 
-        # Delete the processed JSON file, if it exists
         if job.intermediate_data_path:
             processed_file = Path(job.intermediate_data_path)
             if processed_file.exists():
                 processed_file.unlink()
     except Exception as e:
-        # Log this error but don't stop the DB deletion.
-        # The job record is the source of truth.
         print(f"Error deleting files for job {job_id}: {e}")
 
-    # Delete the job record from the database
     job_service.delete_job_by_id(db=db, job_id=job_id)
 
-    # A 204 response has no body, so we return None
     return None
