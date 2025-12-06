@@ -37,9 +37,13 @@ services:
         build:
             context: .
             dockerfile: Dockerfile.app
-        # Revert to a simple command structure. We will add live-reloading later.
-        command: gunicorn --bind 0.0.0.0:8000 -w 4 -k uvicorn.workers.UvicornWorker --user appuser --group appuser app.main:app
-        # Remove all code mounts for now to guarantee the image is self-contained.
+        # --- FIXED COMMAND ---
+        # 1. Runs the initialization script (creates tables once).
+        # 2. Only if that succeeds (&&), starts the Gunicorn server.
+        # This eliminates the race condition.
+        command: >
+            sh -c "python -m app.initial_data &&
+            gunicorn --bind 0.0.0.0:8000 -w 4 -k uvicorn.workers.UvicornWorker --user appuser --group appuser app.main:app"
         volumes:
             - uploaded_files:/app/uploads
         ports:
@@ -56,9 +60,7 @@ services:
         build:
             context: .
             dockerfile: Dockerfile.worker
-        # Revert to your original, working command.
         command: celery -A app.infrastructure.celery_app.celery worker --loglevel=info
-        # Remove all code mounts for now.
         volumes:
             - uploaded_files:/app/uploads
         env_file:

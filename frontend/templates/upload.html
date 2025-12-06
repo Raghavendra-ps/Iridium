@@ -6,10 +6,20 @@
 <div class="card">
     <h1 class="card-title">New Data Conversion</h1>
     <p style="margin-bottom: 1.5rem; color: var(--color-text-muted);">
-        Select a target organization, specify the ERPNext Doctype, and upload your source file.
+        Select the type of data you are importing, the target organization, and your source file.
     </p>
     <form id="uploadForm" style="display: flex; flex-direction: column; gap: 1.5rem;">
 
+        <!-- 1. Import Type Dropdown -->
+        <div class="form-group">
+            <label for="import_type" style="display:block; margin-bottom: 8px; font-weight: 500;">Import Type</label>
+            <select id="import_type" name="doctype" required style="width: 100%; padding: 10px; border: 1px solid var(--color-border); border-radius: 8px; background-color: white;">
+                <option value="" disabled selected>-- Select Import Type --</option>
+                <!-- Options populated by JS -->
+            </select>
+        </div>
+
+        <!-- 2. Organization Dropdown -->
         <div class="form-group">
             <label for="target_org_id" style="display:block; margin-bottom: 8px; font-weight: 500;">Target Organization</label>
             <select id="target_org_id" name="target_org_id" required style="width: 100%; padding: 10px; border: 1px solid var(--color-border); border-radius: 8px; background-color: white;">
@@ -17,13 +27,9 @@
             </select>
         </div>
 
+        <!-- 3. File Input -->
         <div class="form-group">
-            <label for="doctype" style="display:block; margin-bottom: 8px; font-weight: 500;">Target ERPNext Doctype</label>
-            <input type="text" id="doctype" name="doctype" required placeholder="e.g., Sales Invoice, Customer" style="width: 100%; padding: 10px; border: 1px solid var(--color-border); border-radius: 8px;">
-        </div>
-
-        <div class="form-group">
-             <label for="fileInput" style="display:block; margin-bottom: 8px; font-weight: 500;">Source File</label>
+             <label for="fileInput" style="display:block; margin-bottom: 8px; font-weight: 500;">Source File (PDF/Excel/Image)</label>
             <input type="file" id="fileInput" name="file" required style="width: 100%; padding: 10px; border: 1px solid var(--color-border); border-radius: 8px;">
         </div>
 
@@ -40,6 +46,19 @@
 document.addEventListener('DOMContentLoaded', async () => {
     const token = localStorage.getItem('access_token');
     const orgSelect = document.getElementById('target_org_id');
+    const typeSelect = document.getElementById('import_type');
+
+    // Hardcoded list based on our backend config, or could be an API endpoint later
+    const importTypes = [
+        { value: 'attendance', label: 'Attendance (Monthly Sheet)' },
+        { value: 'generic', label: 'Generic / Other' }
+    ];
+
+    // Populate Import Types
+    importTypes.forEach(type => {
+        const option = new Option(type.label, type.value);
+        typeSelect.add(option);
+    });
 
     async function loadOrganizations() {
         try {
@@ -93,14 +112,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             const data = await response.json();
 
             if (response.ok) {
-                // This now correctly uses 'data.id' from the real job object
                 window.location.href = `/jobs/${data.id}`;
             } else {
                 showStatus(data.detail || 'Upload failed.', 'error');
+                submitButton.disabled = false;
+                submitButton.textContent = 'Upload and Begin';
             }
         } catch (error) {
             showStatus('Failed to connect to the server.', 'error');
-        } finally {
             submitButton.disabled = false;
             submitButton.textContent = 'Upload and Begin';
         }

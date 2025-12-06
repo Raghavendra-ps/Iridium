@@ -1,79 +1,225 @@
-{% extends "dashboard_base.html" %} {% block title %}Job #{{ job_id }} -
-Iridium{% endblock %} {% block content %}
-<!-- NEW: Added an ID and a data attribute to pass the job_id to our JS file -->
+{% extends "dashboard_base.html" %}
+
+{% block title %}Job #{{ job_id }} - Iridium{% endblock %}
+
+{% block content %}
 <div id="job-detail-page" data-job-id="{{ job_id }}">
-    <div class="card">
-        <div
-            style="
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-            "
-        >
+
+    <!-- Header -->
+    <div class="card" style="margin-bottom: 20px;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
             <div>
-                <h1 id="job-title" class="card-title">
-                    Loading Job Details...
-                </h1>
-                <p id="job-subtitle" style="color: var(--color-text-muted)"></p>
+                <h1 id="job-title" class="card-title">Loading Job #{{ job_id }}...</h1>
+                <p id="job-subtitle" style="color: var(--color-text-muted)">Fetching details...</p>
             </div>
-            <div
-                id="job-status-badge"
-                style="
-                    background: #eee;
-                    padding: 6px 12px;
-                    border-radius: 99px;
-                    font-size: 0.9rem;
-                    font-weight: 500;
-                "
-            >
+            <div id="job-status-badge" style="background: #eee; padding: 6px 12px; border-radius: 99px; font-size: 0.9rem; font-weight: 500;">
                 LOADING
             </div>
         </div>
-    </div>
-    <div class="card">
-        <h2 class="card-title">Extracted Data (Editable)</h2>
-        <div
-            id="data-grid-container"
-            style="
-                width: 100%;
-                min-height: 400px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                border: 1px solid var(--color-border);
-                border-radius: 8px;
-                background: #f8fafc;
-            "
-        >
-            <p id="grid-status">Waiting for file processing to complete...</p>
+        <div style="margin-top: 10px;">
+            <button onclick="toggleDebug()" style="font-size: 0.8rem; text-decoration: underline; background: none; border: none; color: #666; cursor: pointer;">
+                Toggle Debug / Raw Data
+            </button>
+            <pre id="debug-log" style="display: none; background: #f1f5f9; padding: 10px; border-radius: 4px; font-size: 0.75rem; max-height: 200px; overflow: auto; margin-top: 5px;"></pre>
         </div>
-        <div
-            id="actions-bar"
-            style="
-                margin-top: 1.5rem;
-                display: none;
-                justify-content: space-between;
-                align-items: center;
-            "
-        >
-            <div
-                id="action-status"
-                style="font-size: 0.9rem; color: var(--color-text-muted)"
-            ></div>
-            <div style="display: flex; gap: 1rem">
-                <button id="downloadBtn" class="btn">Download as JSON</button>
-                <button
-                    id="processBtn"
-                    class="btn"
-                    style="background-color: var(--color-accent); color: white"
-                >
-                    Process and Send to ERPNext
-                </button>
-            </div>
+    </div>
+
+    <!-- Data Grid -->
+    <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h2 class="card-title" style="margin: 0;">Extracted Data</h2>
+            <div id="record-count" style="font-size: 0.9rem; color: var(--color-text-muted)"></div>
+        </div>
+
+        <!-- Handsontable Container with EXPLICIT HEIGHT -->
+        <div id="data-grid-container" style="width: 100%; height: 500px; overflow: hidden; border: 1px solid #e2e8f0;">
+            <div style="padding: 20px; text-align: center; color: #64748b;">Initializing Grid...</div>
+        </div>
+
+        <!-- Actions -->
+        <div id="actions-bar" style="margin-top: 1.5rem; display: none; justify-content: flex-end; gap: 1rem;">
+            <button id="processBtn" class="btn" style="background-color: var(--color-accent); color: white">
+                Submit Records to ERPNext
+            </button>
         </div>
     </div>
 </div>
-{% endblock %} {% block scripts %}
-<!-- The entire script block is replaced by this single line -->
-<script src="/static/js/job_detail.js" defer></script>
+{% endblock %}
+
+{% block scripts %}
+<!-- Load Handsontable explicitly -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/handsontable/dist/handsontable.full.min.css" />
+<script src="https://cdn.jsdelivr.net/npm/handsontable/dist/handsontable.full.min.js"></script>
+
+<script>
+    // Debug helper
+    function log(msg) {
+        const el = document.getElementById('debug-log');
+        const line = document.createElement('div');
+        line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+        el.appendChild(line);
+        console.log(msg);
+    }
+    function toggleDebug() {
+        const el = document.getElementById('debug-log');
+        el.style.display = el.style.display === 'none' ? 'block' : 'none';
+    }
+
+    document.addEventListener("DOMContentLoaded", async function () {
+        const page = document.getElementById("job-detail-page");
+        const jobId = page.dataset.jobId;
+        const token = localStorage.getItem("access_token");
+
+        // Elements
+        const elTitle = document.getElementById("job-title");
+        const elSubtitle = document.getElementById("job-subtitle");
+        const elBadge = document.getElementById("job-status-badge");
+        const elGrid = document.getElementById("data-grid-container");
+        const elActions = document.getElementById("actions-bar");
+        const elCount = document.getElementById("record-count");
+        const btnProcess = document.getElementById("processBtn");
+
+        let hot;
+
+        // Column Definitions
+        const GRID_CONFIGS = {
+            "attendance": [
+                {data: "employee", title: "Emp ID", width: 100},
+                {data: "employee_name", title: "Name", width: 200, readOnly: true},
+                {data: "attendance_date", title: "Date", width: 120, type: "date", dateFormat: "YYYY-MM-DD"},
+                {data: "status", title: "Status", width: 120, type: "dropdown", source: ["Absent", "On Leave", "Half Day"]},
+                {data: "shift", title: "Shift", width: 100},
+                {data: "leave_type", title: "Leave Type", width: 100}
+            ],
+            "generic": [
+                {data: "extracted_line", title: "Data", width: 400}
+            ]
+        };
+
+        // 1. Fetch Status
+        async function checkStatus() {
+            try {
+                log("Fetching job status...");
+                const res = await fetch(`/api/v1/conversions/${jobId}/status`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                const job = await res.json();
+
+                elTitle.textContent = job.original_filename;
+                elSubtitle.textContent = `${job.target_doctype} | ${job.created_at}`;
+                elBadge.textContent = job.status;
+
+                // Color Logic
+                const colors = {
+                    'COMPLETED': '#dcfce7',
+                    'SUBMISSION_FAILED': '#fee2e2',
+                    'AWAITING_VALIDATION': '#fef9c3',
+                    'PROCESSING': '#e0f2fe'
+                };
+                elBadge.style.backgroundColor = colors[job.status] || '#eee';
+
+                log(`Status: ${job.status}`);
+
+                if (job.status === "AWAITING_VALIDATION" || job.status === "SUBMISSION_FAILED") {
+                    // Load Data
+                    if (!hot) loadGrid(job.target_doctype);
+                    elActions.style.display = "flex";
+                } else if (job.status === "PROCESSING" || job.status === "UPLOADED") {
+                    elGrid.innerHTML = '<div style="padding:40px; text-align:center;">Processing... Refreshing in 3s</div>';
+                    setTimeout(checkStatus, 3000);
+                } else {
+                    elGrid.innerHTML = `<div style="padding:40px; text-align:center;">Job is ${job.status}. No data to edit.</div>`;
+                }
+
+            } catch (e) {
+                log("Error fetching status: " + e.message);
+            }
+        }
+
+        // 2. Load Grid
+        async function loadGrid(docType) {
+            try {
+                log("Fetching data extracted by worker...");
+                const res = await fetch(`/api/v1/conversions/${jobId}/data`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+
+                if (!res.ok) throw new Error("Data file not found (404)");
+
+                const data = await res.json();
+                log(`Received ${data.length} records.`);
+                elCount.textContent = `${data.length} records found`;
+
+                // DEBUG: Dump raw data to log
+                document.getElementById('debug-log').textContent = JSON.stringify(data.slice(0, 3), null, 2) + "\n... (more)";
+
+                if (data.length === 0) {
+                    elGrid.innerHTML = '<div style="padding:40px; text-align:center; color:red;">0 Records Extracted. Check Source File.</div>';
+                    return;
+                }
+
+                // Clear
+                elGrid.innerHTML = "";
+
+                const typeKey = (docType || "generic").toLowerCase();
+                const columns = GRID_CONFIGS[typeKey] || GRID_CONFIGS["generic"];
+
+                hot = new Handsontable(elGrid, {
+                    data: data,
+                    columns: columns,
+                    rowHeaders: true,
+                    colHeaders: columns.map(c => c.title),
+                    licenseKey: 'non-commercial-and-evaluation',
+                    height: '100%', // Fill the 500px container
+                    width: '100%',
+                    stretchH: 'all',
+                    className: 'htMiddle',
+                    minSpareRows: 1
+                });
+
+                log("Grid initialized successfully.");
+
+            } catch (e) {
+                log("Error loading grid: " + e.message);
+                elGrid.innerHTML = `<div style="padding:20px; color:red;">Load Error: ${e.message}</div>`;
+            }
+        }
+
+        // 3. Submit
+        btnProcess.addEventListener("click", async () => {
+            if(!hot) return;
+            const cleanData = hot.getSourceData().filter(row => row.employee || row.status);
+
+            btnProcess.disabled = true;
+            btnProcess.textContent = "Sending...";
+
+            try {
+                const res = await fetch(`/api/v1/conversions/${jobId}/submit`, {
+                    method: "POST",
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({ data: cleanData })
+                });
+
+                if(res.ok) {
+                    alert("Submission started successfully.");
+                    window.location.reload();
+                } else {
+                    const err = await res.json();
+                    alert("Error: " + err.detail);
+                    btnProcess.disabled = false;
+                    btnProcess.textContent = "Submit Records to ERPNext";
+                }
+            } catch(e) {
+                alert("Network Error");
+                btnProcess.disabled = false;
+            }
+        });
+
+        // Start
+        checkStatus();
+    });
+</script>
 {% endblock %}

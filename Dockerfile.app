@@ -11,6 +11,9 @@ ENV PATH="$POETRY_HOME/bin:$PATH"
 RUN apt-get update && apt-get install -y curl && curl -sSL https://install.python-poetry.org | python3 - && apt-get clean
 WORKDIR /app
 COPY pyproject.toml poetry.lock ./
+
+# --- FIX: Update lock file inside the build to match pyproject.toml ---
+RUN poetry lock --no-update
 RUN poetry install --no-interaction --no-ansi
 
 # Stage 2: Production image
@@ -29,7 +32,6 @@ WORKDIR $APP_HOME
 # Copy the virtual environment from the builder
 COPY --from=builder /app/.venv/ ./.venv/
 
-# --- THE ACTUAL FIX ---
 # Copy the ENTIRE application context into the image.
 # This includes app/, alembic/, frontend/, alembic.ini, etc.
 COPY . .

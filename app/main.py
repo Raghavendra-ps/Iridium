@@ -9,21 +9,8 @@ from redis import Redis
 from sqlalchemy.orm import Session
 
 from app.api.endpoints import auth, conversions, organizations, pages, users
-
-# --- END: New imports ---
 from app.core.config import settings
-
-# --- START: New imports for automatic table creation ---
-from app.db.base import Base
-from app.db.session import engine, get_db
-
-# --- START: Automatic Table Creation ---
-# This line tells SQLAlchemy to create all tables based on the models
-# it knows about (via the Base object). It will only create tables
-# that do not already exist, so it's safe to run on every startup.
-Base.metadata.create_all(bind=engine)
-# --- END: Automatic Table Creation ---
-
+from app.db.session import get_db
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -87,3 +74,7 @@ app.include_router(
 
 # --- Include Page Routers (HTML serving) ---
 app.include_router(pages.router, tags=["pages"])
+
+# --- Mount Static Files ---
+# This is required for serving CSS and JS files located in frontend/static
+app.mount("/static", StaticFiles(directory="frontend/static"), name="static")
