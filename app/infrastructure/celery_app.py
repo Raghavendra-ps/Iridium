@@ -1,21 +1,25 @@
+# Iridium-main/app/infrastructure/celery_app.py
+
 from celery import Celery
 from celery.signals import worker_process_init
-from app.core.config import settings
-from app.db.session import engine # Import the engine object
 
-# This signal is sent by Celery when a worker process is initialized.
-# We use it to dispose of the old database engine connection pool.
-# This prevents the forked worker process from using stale connections
-# from the parent (Gunicorn) process. This is the definitive fix.
+from app.core.config import settings
+from app.db.session import engine
+
 @worker_process_init.connect
 def init_worker(**kwargs):
     engine.dispose()
 
-# Initialize Celery
+def init_worker(**kwargs):
+    engine.dispose()
+
 celery = Celery("iridium_worker")
 
-# Load configuration from our central settings object
-celery.config_from_object(settings, namespace='CELERY')
+# --- THE FIX ---
+# Instead of using a namespace, we will explicitly configure the two
+# most important settings. This is more robust.
+celery.conf.broker_url = settings.CELERY_BROKER_URL
+celery.conf.result_backend = settings.CELERY_RESULT_BACKEND
+# --- END OF FIX ---
 
-# Tell Celery to automatically discover tasks
 celery.autodiscover_tasks(packages=["app.infrastructure"])

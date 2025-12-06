@@ -4,6 +4,7 @@ import logging
 
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.responses import RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from redis import Redis
 from sqlalchemy.orm import Session
 
