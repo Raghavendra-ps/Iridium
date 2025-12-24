@@ -29,7 +29,10 @@
 
         <!-- 3. File Input -->
         <div class="form-group">
-             <label for="fileInput" style="display:block; margin-bottom: 8px; font-weight: 500;">Source File (PDF/Excel/Image)</label>
+             <label for="fileInput" style="display:block; margin-bottom: 8px; font-weight: 500;">Source File</label>
+             <div style="font-size: 0.85rem; color: #666; margin-bottom: 5px;">
+                 Supported: PDF, Excel (.xlsx, .xls), CSV, Word (.docx), Images (.png, .jpg), JSON
+             </div>
             <input type="file" id="fileInput" name="file" required style="width: 100%; padding: 10px; border: 1px solid var(--color-border); border-radius: 8px;">
         </div>
 
@@ -48,7 +51,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const orgSelect = document.getElementById('target_org_id');
     const typeSelect = document.getElementById('import_type');
 
-    // Hardcoded list based on our backend config, or could be an API endpoint later
+    // Configuration for Dropdown
     const importTypes = [
         { value: 'attendance', label: 'Attendance (Monthly Sheet)' },
         { value: 'generic', label: 'Generic / Other' }
