@@ -1,4 +1,4 @@
-# Iridium — Gretis DataPort
+# Iridium
 
 ![Python Version](https://img.shields.io/badge/python-3.10-blue.svg)
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
@@ -143,7 +143,7 @@ Map the code `WO` (Weekly Off) to `IGNORE` so it is skipped during ERPNext submi
 
 ---
 
-## 📄 Environment Variables
+## Environment Variables
 
 All configuration is managed through the `.env` file.
 
@@ -160,7 +160,7 @@ All configuration is managed through the `.env` file.
 
 ---
 
-## 🗺️ Future Roadmap
+## Future Roadmap
 
 - Automated testing for reliability and regression prevention
 - Real-time validation warnings in the grid for duplicates and missing or invalid data
@@ -170,6 +170,17 @@ All configuration is managed through the `.env` file.
 
 ---
 
-## 📜 License
+## License
 
-This project is licensed under the **MIT License**.
+© 2025 Gretis India Private Limited. All rights reserved.
+
+This software and its source code are proprietary and confidential.
+Unauthorized copying, distribution, use, modification, or access
+of this software, via any medium, is strictly prohibited.
+
+The software is licensed for internal business use by Gretis India Private Limited.
+No other entity or individual is granted any rights to use, modify,
+redistribute, or access this software in any form without prior written
+authorization from Gretis India Private Limited.
+
+Violation of these terms may result in civil and criminal prosecution.
