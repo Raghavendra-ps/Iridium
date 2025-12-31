@@ -5,19 +5,108 @@
 {% block content %}
 <div class="card">
     <h1 class="card-title">Dashboard Overview</h1>
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.5rem;">
         <div style="border: 1px solid var(--color-border); padding: 1.5rem; border-radius: var(--radius-lg);">
-            <div style="font-size: 2.5rem; font-weight: 700; color: var(--color-primary);">12</div>
-            <div style="color: var(--color-text-muted); margin-top: 0.5rem;">Jobs Completed (24h)</div>
+            <div id="jobs-today-stat" style="font-size: 2.5rem; font-weight: 700; color: var(--color-primary);">-</div>
+            <div style="color: var(--color-text-muted); margin-top: 0.5rem;">Jobs Today</div>
         </div>
         <div style="border: 1px solid var(--color-border); padding: 1.5rem; border-radius: var(--radius-lg);">
-            <div style="font-size: 2.5rem; font-weight: 700; color: var(--color-primary);">3</div>
-            <div style="color: var(--color-text-muted); margin-top: 0.5rem;">Jobs Pending Validation</div>
+            <div id="pending-validation-stat" style="font-size: 2.5rem; font-weight: 700; color: var(--color-primary);">-</div>
+            <div style="color: var(--color-text-muted); margin-top: 0.5rem;">Pending Validation</div>
         </div>
         <div style="border: 1px solid var(--color-border); padding: 1.5rem; border-radius: var(--radius-lg);">
-            <div style="font-size: 2.5rem; font-weight: 700; color: var(--color-primary);">1.2 GB</div>
-            <div style="color: var(--color-text-muted); margin-top: 0.5rem;">Data Processed</div>
+            <div id="jobs-this-week-stat" style="font-size: 2.5rem; font-weight: 700; color: var(--color-primary);">-</div>
+            <div style="color: var(--color-text-muted); margin-top: 0.5rem;">Jobs This Week</div>
+        </div>
+        <div style="border: 1px solid var(--color-border); padding: 1.5rem; border-radius: var(--radius-lg);">
+            <div id="failed-jobs-stat" style="font-size: 2.5rem; font-weight: 700; color: #ef4444;">-</div>
+            <div style="color: var(--color-text-muted); margin-top: 0.5rem;">Failed Jobs</div>
         </div>
     </div>
 </div>
+
+<div class="card">
+    <h2 class="card-title">Recent Activity</h2>
+    <table style="width: 100%; border-collapse: collapse; text-align: left;">
+        <thead>
+            <tr style="border-bottom: 1px solid var(--color-border);">
+                <th style="padding: 12px 0;">Filename</th>
+                <th style="padding: 12px 0;">Submitted</th>
+                <th style="padding: 12px 0;">Status</th>
+                <th style="padding: 12px 0;"></th>
+            </tr>
+        </thead>
+        <tbody id="recent-jobs-table-body">
+            <tr><td colspan="4" style="padding: 48px 0; text-align: center; color: var(--color-text-muted);">Loading activity...</td></tr>
+        </tbody>
+    </table>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// This script runs on the Home/Dashboard page after the user is authenticated.
+function onPageLoad(token) {
+    const jobsTodayEl = document.getElementById('jobs-today-stat');
+    const pendingValidationEl = document.getElementById('pending-validation-stat');
+    const jobsThisWeekEl = document.getElementById('jobs-this-week-stat');
+    const failedJobsEl = document.getElementById('failed-jobs-stat');
+    const recentJobsTableBody = document.getElementById('recent-jobs-table-body');
+
+    const fetchAndRenderStats = async () => {
+        try {
+            const response = await fetch('/api/v1/dashboard/stats', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            if (!response.ok) {
+                throw new Error(`Failed to fetch dashboard stats: ${response.statusText}`);
+            }
+            const stats = await response.json();
+
+            // Populate the statistic cards
+            jobsTodayEl.textContent = stats.jobs_today;
+            pendingValidationEl.textContent = stats.status_counts.awaiting_validation;
+            jobsThisWeekEl.textContent = stats.jobs_this_week;
+            failedJobsEl.textContent = stats.status_counts.submission_failed;
+
+            // Populate the recent jobs table
+            recentJobsTableBody.innerHTML = ''; // Clear the 'loading' message
+            if (stats.recent_jobs.length === 0) {
+                recentJobsTableBody.innerHTML = `<tr><td colspan="4" style="padding: 48px 0; text-align: center; color: var(--color-text-muted);">No recent job activity.</td></tr>`;
+            } else {
+                stats.recent_jobs.forEach(job => {
+                    const row = document.createElement('tr');
+                    row.style.borderBottom = '1px solid var(--color-border)';
+
+                    const date = new Date(job.created_at);
+                    const formattedDate = date.toLocaleString('en-US', {
+                        year: 'numeric', month: 'short', day: 'numeric',
+                        hour: 'numeric', minute: '2-digit', hour12: true
+                    });
+
+                    row.innerHTML = `
+                        <td style="padding: 16px 0;">${job.original_filename}</td>
+                        <td style="padding: 16px 0;">${formattedDate}</td>
+                        <td style="padding: 16px 0;">
+                            <span style="background: #eee; padding: 4px 8px; border-radius: 6px; font-size: 0.8rem; font-weight: 500;">
+                                ${job.status}
+                            </span>
+                        </td>
+                        <td style="padding: 16px 0; text-align: right;">
+                            <a href="/jobs/${job.id}" class="btn">View</a>
+                        </td>
+                    `;
+                    recentJobsTableBody.appendChild(row);
+                });
+            }
+        } catch(e) {
+            console.error("Dashboard Error:", e);
+            document.querySelector('.card').innerHTML = `<p style="color: red; text-align: center;">Error loading dashboard data.</p>`;
+        }
+    };
+
+    fetchAndRenderStats();
+}
+</script>
 {% endblock %}

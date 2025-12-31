@@ -1,10 +1,11 @@
 {% extends "dashboard_base.html" %} {% block title %}Settings - Iridium{%
 endblock %} {% block content %}
+
+<!-- Card for Linking Organizations -->
 <div class="card">
     <h1 class="card-title">Link New Organization</h1>
     <p style="color: var(--color-text-muted); margin-bottom: 1.5rem">
-        Enter a GOG Organization ID and the connection details for its
-        corresponding ERPNext instance.
+        Enter the connection details for an ERPNext instance.
     </p>
     <form
         id="newLinkForm"
@@ -19,7 +20,7 @@ endblock %} {% block content %}
             <label
                 for="organization_id"
                 style="display: block; margin-bottom: 8px; font-weight: 500"
-                >GOG Organization ID</label
+                >Organization ID</label
             >
             <input
                 type="text"
@@ -122,23 +123,189 @@ endblock %} {% block content %}
         </div>
     </form>
 </div>
-
 <div class="card">
     <h2 class="card-title">Linked Organizations</h2>
-    <div id="orgs-list">
-        <p>Loading...</p>
-    </div>
+    <div id="orgs-list"><p>Loading...</p></div>
 </div>
+
+<!-- Card for Import Templates -->
+<div class="card">
+    <h1 class="card-title">Import Templates</h1>
+    <p style="color: var(--color-text-muted); margin-bottom: 1.5rem">
+        Define how to read your source files. Select a Parsing Mode and map the
+        column names from your Excel/CSV to the required fields.
+    </p>
+    <form id="newTemplateForm">
+        <div
+            style="
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 1.5rem;
+                align-items: flex-start;
+            "
+        >
+            <!-- Column 1: Basic Info -->
+            <div>
+                <div class="form-group" style="margin-bottom: 1rem">
+                    <label
+                        for="template_name"
+                        style="
+                            font-weight: 500;
+                            margin-bottom: 8px;
+                            display: block;
+                        "
+                        >Template Name</label
+                    >
+                    <input
+                        type="text"
+                        id="template_name"
+                        placeholder="e.g., Monthly Leave Summary"
+                        required
+                        style="
+                            width: 100%;
+                            padding: 10px;
+                            border: 1px solid var(--color-border);
+                            border-radius: 8px;
+                        "
+                    />
+                </div>
+                <div class="form-group">
+                    <label
+                        for="parser_mode"
+                        style="
+                            font-weight: 500;
+                            margin-bottom: 8px;
+                            display: block;
+                        "
+                        >Parsing Mode</label
+                    >
+                    <select
+                        id="parser_mode"
+                        required
+                        style="
+                            width: 100%;
+                            padding: 10px;
+                            border: 1px solid var(--color-border);
+                            border-radius: 8px;
+                        "
+                    >
+                        <option value="DATE_REFERENCE">
+                            Date Reference (e.g., Leave Summary)
+                        </option>
+                        <option value="MATRIX">
+                            Matrix (e.g., Daily Grid)
+                        </option>
+                    </select>
+                </div>
+            </div>
+            <!-- Column 2: Dynamic Configuration Fields -->
+            <div id="template-config-fields">
+                <!-- JS will populate this section based on parser_mode -->
+            </div>
+        </div>
+        <div
+            style="
+                display: flex;
+                justify-content: flex-end;
+                align-items: center;
+                gap: 1rem;
+                margin-top: 1.5rem;
+            "
+        >
+            <div id="template-form-status" style="font-size: 0.9rem"></div>
+            <button
+                type="submit"
+                class="btn"
+                style="background-color: var(--color-accent); color: white"
+            >
+                Save New Template
+            </button>
+        </div>
+    </form>
+</div>
+<div class="card">
+    <h2 class="card-title">My Import Templates</h2>
+    <div id="templates-list"><p>Loading templates...</p></div>
+</div>
+
+<!-- Card for Attendance Mapping Profiles -->
+<div class="card">
+    <h1 class="card-title">Attendance Code Mappings</h1>
+    <p style="color: var(--color-text-muted); margin-bottom: 1.5rem">
+        Create profiles to map codes from `MATRIX` (Daily Grid) source files to
+        standard ERPNext statuses (e.g., 'P' ➜ Present).
+    </p>
+    <form id="newMappingProfileForm">
+        <div
+            style="
+                display: flex;
+                gap: 1rem;
+                align-items: flex-end;
+                margin-bottom: 1.5rem;
+            "
+        >
+            <div style="flex-grow: 1">
+                <label
+                    for="profile_name"
+                    style="display: block; margin-bottom: 8px; font-weight: 500"
+                    >New Profile Name</label
+                >
+                <input
+                    type="text"
+                    id="profile_name"
+                    placeholder="e.g., Factory Attendance Rules"
+                    required
+                    style="
+                        width: 100%;
+                        padding: 10px;
+                        border: 1px solid var(--color-border);
+                        border-radius: 8px;
+                    "
+                />
+            </div>
+            <button type="button" id="add-mapping-row-btn" class="btn">
+                Add Row
+            </button>
+        </div>
+        <div
+            id="mapping-rows-container"
+            style="
+                display: flex;
+                flex-direction: column;
+                gap: 0.5rem;
+                margin-bottom: 1.5rem;
+            "
+        ></div>
+        <div
+            style="
+                display: flex;
+                justify-content: flex-end;
+                align-items: center;
+                gap: 1rem;
+            "
+        >
+            <div
+                id="mapping-form-status"
+                style="font-size: 0.9rem; min-height: 1.2rem"
+            ></div>
+            <button
+                type="submit"
+                class="btn"
+                style="background-color: var(--color-accent); color: white"
+            >
+                Save New Profile
+            </button>
+        </div>
+    </form>
+</div>
+<div class="card">
+    <h2 class="card-title">My Mapping Profiles</h2>
+    <div id="profiles-list"><p>Loading profiles...</p></div>
+</div>
+
 {% endblock %} {% block scripts %}
 <script>
     function onPageLoad(token) {
-        const orgsList = document.getElementById("orgs-list");
-        const newLinkForm = document.getElementById("newLinkForm");
-        const formStatus = document.getElementById("form-status");
-        const submitButton = newLinkForm.querySelector('button[type="submit"]');
-
-        let pollingInterval;
-
         const apiCall = async (url, options = {}) => {
             const defaultOptions = {
                 headers: {
@@ -151,91 +318,30 @@ endblock %} {% block content %}
                 ...options,
             });
             if (response.status === 401) {
-                localStorage.removeItem("access_token");
                 window.location.href = "/login";
                 throw new Error("Unauthorized");
             }
             return response;
         };
 
-        const updateStatusUI = (linkId, data) => {
-            const indicator = document.querySelector(
-                `[data-status-indicator="${linkId}"]`,
-            );
-            const text = document.querySelector(
-                `[data-status-text="${linkId}"]`,
-            );
-            if (!indicator || !text) return;
+        initOrganizations(apiCall);
+        initImportTemplates(apiCall);
+        initMappingProfiles(apiCall);
 
-            const status = data?.status || "unknown";
-            const details = data?.details || "Could not determine status.";
-            indicator.style.backgroundColor =
-                status === "online"
-                    ? "#10b981"
-                    : status === "error"
-                      ? "#ef4444"
-                      : "#64748b";
-            text.textContent = details;
-        };
+        const style = document.createElement("style");
+        style.textContent = `
+        .org-card { border: 1px solid var(--color-border); border-radius: 8px; padding: 1rem; display: flex; justify-content: space-between; align-items: center; }
+        .org-id { color: var(--color-text-muted); font-size: 0.9rem; margin-top: 4px; }
+        `;
+        document.head.appendChild(style);
+    }
 
-        const checkStatusForLink = async (linkId) => {
-            try {
-                const response = await apiCall(
-                    `/api/v1/linked-organizations/${linkId}/status`,
-                );
-                if (!response.ok) {
-                    updateStatusUI(linkId, {
-                        status: "error",
-                        details: `API Error: ${response.status}`,
-                    });
-                    return;
-                }
-                const data = await response.json();
-                updateStatusUI(linkId, data);
-            } catch (err) {
-                updateStatusUI(linkId, {
-                    status: "error",
-                    details: "Network error during status check.",
-                });
-            }
-        };
-
-        const checkAllStatuses = () => {
-            document.querySelectorAll("[data-link-id]").forEach((link) => {
-                checkStatusForLink(link.dataset.linkId);
-            });
-        };
-
-        const renderOrgs = (orgs) => {
-            if (orgs.length === 0) {
-                orgsList.innerHTML = `<p style="color: var(--color-text-muted);">No organizations have been linked yet.</p>`;
-                return;
-            }
-
-            orgsList.innerHTML =
-                '<div style="display: flex; flex-direction: column; gap: 1rem;">' +
-                orgs
-                    .map(
-                        (org) => `
-            <div class="org-card" data-link-id="${org.id}">
-                <div>
-                    <strong>${org.instance_name}</strong>
-                    <p class="org-id">ERPNext URL: ${org.erpnext_url}</p>
-                    <div class="status-line">
-                        <span class="status-indicator" data-status-indicator="${org.id}"></span>
-                        <span class="status-text" data-status-text="${org.id}">Checking GOG Status...</span>
-                    </div>
-                </div>
-                <button class="btn btn-danger" onclick="deleteLink(${org.id})">Delete</button>
-            </div>`,
-                    )
-                    .join("") +
-                "</div>";
-
-            checkAllStatuses();
-            if (pollingInterval) clearInterval(pollingInterval);
-            pollingInterval = setInterval(checkAllStatuses, 30000);
-        };
+    // --- LOGIC FOR ORGANIZATIONS SECTION ---
+    function initOrganizations(apiCall) {
+        const orgsList = document.getElementById("orgs-list");
+        const newLinkForm = document.getElementById("newLinkForm");
+        const formStatus = document.getElementById("form-status");
+        const submitButton = newLinkForm.querySelector('button[type="submit"]');
 
         const fetchAndRenderOrgs = async () => {
             try {
@@ -243,7 +349,22 @@ endblock %} {% block content %}
                 if (!response.ok)
                     throw new Error("Failed to fetch organizations");
                 const orgs = await response.json();
-                renderOrgs(orgs);
+                if (orgs.length === 0) {
+                    orgsList.innerHTML = `<p style="color: var(--color-text-muted);">No organizations have been linked yet.</p>`;
+                    return;
+                }
+                orgsList.innerHTML =
+                    '<div style="display: flex; flex-direction: column; gap: 1rem;">' +
+                    orgs
+                        .map(
+                            (org) => `
+                    <div class="org-card" data-link-id="${org.id}">
+                        <div><strong>${org.instance_name}</strong><p class="org-id">ERPNext URL: ${org.erpnext_url}</p></div>
+                        <button class="btn btn-danger" onclick="deleteLink(${org.id})">Delete</button>
+                    </div>`,
+                        )
+                        .join("") +
+                    "</div>";
             } catch (error) {
                 orgsList.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
             }
@@ -251,63 +372,38 @@ endblock %} {% block content %}
 
         newLinkForm.addEventListener("submit", async (e) => {
             e.preventDefault();
-            formStatus.textContent = "Validating and linking...";
-            formStatus.style.color = "var(--color-text-muted)";
+            formStatus.textContent = "Validating...";
             submitButton.disabled = true;
-            submitButton.textContent = "Linking...";
-
-            const formData = new FormData(newLinkForm);
-            const data = Object.fromEntries(formData.entries());
-
+            const data = Object.fromEntries(new FormData(e.target).entries());
             try {
                 const response = await apiCall(
                     "/api/v1/linked-organizations/",
-                    {
-                        method: "POST",
-                        body: JSON.stringify(data),
-                    },
+                    { method: "POST", body: JSON.stringify(data) },
                 );
-
-                // --- START: NEW ROBUST ERROR HANDLING ---
                 if (!response.ok) {
-                    // Read the response body as text ONCE. This is safe.
-                    const errorText = await response.text();
-                    let errorDetail = errorText; // Default to the raw text
-
-                    // Now, TRY to parse the text as JSON to get a cleaner message.
-                    try {
-                        const errorData = JSON.parse(errorText);
-                        // If parsing succeeds, use the 'detail' field if it exists.
-                        errorDetail =
-                            errorData.detail || JSON.stringify(errorData);
-                    } catch (jsonError) {
-                        // If parsing fails, we don't care. We already have the raw text.
-                    }
-                    // Throw the cleanest error message we could find.
-                    throw new Error(errorDetail);
+                    const errorData = await response.json();
+                    throw new Error(
+                        errorData.detail || `HTTP Error ${response.status}`,
+                    );
                 }
-                // --- END: NEW ROBUST ERROR HANDLING ---
-
-                // If we get here, the response was successful (2xx status code).
-                const responseData = await response.json();
-
                 newLinkForm.reset();
+                formStatus.textContent = "Successfully linked!";
                 formStatus.style.color = "green";
-                formStatus.textContent = `Successfully linked "${responseData.organization_id}"!`;
-                setTimeout(() => (formStatus.textContent = ""), 4000);
                 fetchAndRenderOrgs();
+                setTimeout(() => (formStatus.textContent = ""), 4000);
             } catch (error) {
-                formStatus.style.color = "red";
-                // This will now display either the clean JSON error or the raw HTML/text error.
-                formStatus.innerHTML = `<details><summary>Error:</summary><pre style="white-space: pre-wrap; text-align: left;">${error.message}</pre></details>`;
+                formStatus.innerHTML = `<span style="color: red;">Error: ${error.message}</span>`;
             } finally {
                 submitButton.disabled = false;
-                submitButton.textContent = "Link Organization";
             }
         });
 
         window.deleteLink = async (linkId) => {
-            if (!confirm("Are you sure you want to unlink this organization?"))
+            if (
+                !confirm(
+                    "Are you sure you want to delete this linked organization?",
+                )
+            )
                 return;
             try {
                 const response = await apiCall(
@@ -317,30 +413,324 @@ endblock %} {% block content %}
                 if (!response.ok) throw new Error("Failed to delete link.");
                 fetchAndRenderOrgs();
             } catch (error) {
-                alert(`Error: ${error.message}`);
+                alert("Failed to delete link.");
+            }
+        };
+        fetchAndRenderOrgs();
+    }
+
+    // --- LOGIC FOR IMPORT TEMPLATES SECTION ---
+    function initImportTemplates(apiCall) {
+        const newTemplateForm = document.getElementById("newTemplateForm");
+        const templateNameInput = document.getElementById("template_name");
+        const parserModeSelect = document.getElementById("parser_mode");
+        const configFieldsContainer = document.getElementById(
+            "template-config-fields",
+        );
+        const templatesList = document.getElementById("templates-list");
+        const formStatus = document.getElementById("template-form-status");
+
+        const dateReferenceFields = `
+            <div class="form-group" style="margin-bottom: 1rem;">
+                <label for="config-header_row" style="font-weight: 500; margin-bottom: 8px; display: block;">Header Row Number</label>
+                <input type="number" id="config-header_row" value="0" min="0" required style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 8px;">
+                <small style="color: #666;">The row number containing column names (starts from 0).</small>
+            </div>
+            <div class="form-group" style="margin-bottom: 1rem;">
+                <label for="config-employee_id_column" style="font-weight: 500; margin-bottom: 8px; display: block;">Employee ID Column</label>
+                <input type="text" id="config-employee_id_column" placeholder="e.g., NAME" required style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 8px;">
+            </div>
+            <div class="form-group" style="margin-bottom: 1rem;">
+                <label for="config-dates_column" style="font-weight: 500; margin-bottom: 8px; display: block;">Leave Dates Column</label>
+                <input type="text" id="config-dates_column" placeholder="e.g., REFERENCES" required style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 8px;">
+            </div>
+            <div class="form-group" style="margin-bottom: 1rem;">
+                <label for="config-status_to_apply" style="font-weight: 500; margin-bottom: 8px; display: block;">Apply this Status</label>
+                <select id="config-status_to_apply" required style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 8px;">
+                    <option value="On Leave" selected>On Leave</option>
+                    <option value="Absent">Absent</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="config-shift_type" style="font-weight: 500; margin-bottom: 8px; display: block;">Default Shift Type</label>
+                <input type="text" id="config-shift_type" value="Standard" required style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 8px;">
+            </div>`;
+
+        const matrixFields = `
+            <div class="form-group" style="margin-bottom: 1rem;">
+                <label for="config-header_row" style="font-weight: 500; margin-bottom: 8px; display: block;">Header Row Number</label>
+                <input type="number" id="config-header_row" value="0" min="0" required style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 8px;">
+                <small style="color: #666;">The row number containing column names (starts from 0).</small>
+            </div>
+            <div class="form-group" style="margin-bottom: 1rem;">
+                <label for="config-employee_id_column" style="font-weight: 500; margin-bottom: 8px; display: block;">Employee ID Column</label>
+                <input type="text" id="config-employee_id_column" placeholder="e.g., EMP_CODE" required style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 8px;">
+            </div>
+            <div class="form-group" style="margin-bottom: 1rem;">
+                <label for="config-start_column" style="font-weight: 500; margin-bottom: 8px; display: block;">First Day Column</label>
+                <input type="text" id="config-start_column" placeholder="e.g., '1'" required style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 8px;">
+            </div>
+            <div class="form-group">
+                <label for="config-shift_type" style="font-weight: 500; margin-bottom: 8px; display: block;">Default Shift Type</label>
+                <input type="text" id="config-shift_type" value="Standard" required style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 8px;">
+            </div>
+            <p style="color: #666; font-size: 0.8rem; margin-top: 1rem;">This mode requires a <strong>Code Mapping Profile</strong> to be selected during upload.</p>`;
+
+        const updateConfigFields = () => {
+            configFieldsContainer.innerHTML =
+                parserModeSelect.value === "DATE_REFERENCE"
+                    ? dateReferenceFields
+                    : matrixFields;
+        };
+        parserModeSelect.addEventListener("change", updateConfigFields);
+
+        newTemplateForm.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const submitButton = e.target.querySelector(
+                'button[type="submit"]',
+            );
+            submitButton.disabled = true;
+            formStatus.textContent = "Saving...";
+
+            let config = {
+                mode: parserModeSelect.value,
+                header_row:
+                    parseInt(
+                        document.getElementById("config-header_row").value,
+                        10,
+                    ) || 0,
+                shift_type: document.getElementById("config-shift_type").value,
+            };
+
+            if (config.mode === "DATE_REFERENCE") {
+                config.employee_id_column = document.getElementById(
+                    "config-employee_id_column",
+                ).value;
+                config.dates_column = document.getElementById(
+                    "config-dates_column",
+                ).value;
+                config.status_to_apply = document.getElementById(
+                    "config-status_to_apply",
+                ).value;
+            } else if (config.mode === "MATRIX") {
+                config.employee_id_column = document.getElementById(
+                    "config-employee_id_column",
+                ).value;
+                config.start_column = document.getElementById(
+                    "config-start_column",
+                ).value;
+            }
+
+            const payload = { name: templateNameInput.value, config: config };
+            try {
+                const response = await apiCall("/api/v1/import-templates/", {
+                    method: "POST",
+                    body: JSON.stringify(payload),
+                });
+                const data = await response.json();
+                if (!response.ok)
+                    throw new Error(data.detail || "Failed to save template.");
+                formStatus.textContent = "Template saved!";
+                formStatus.style.color = "green";
+                newTemplateForm.reset();
+                updateConfigFields();
+                fetchAndRenderTemplates();
+                setTimeout(() => (formStatus.textContent = ""), 4000);
+            } catch (error) {
+                formStatus.textContent = `Error: ${error.message}`;
+                formStatus.style.color = "red";
+            } finally {
+                submitButton.disabled = false;
+            }
+        });
+
+        const fetchAndRenderTemplates = async () => {
+            try {
+                const response = await apiCall("/api/v1/import-templates/");
+                if (!response.ok) throw new Error("Failed to fetch templates.");
+                const templates = await response.json();
+                if (templates.length === 0) {
+                    templatesList.innerHTML = `<p style="color: var(--color-text-muted);">No import templates created yet.</p>`;
+                    return;
+                }
+                templatesList.innerHTML = templates
+                    .map(
+                        (t) => `
+                    <div class="org-card" style="margin-bottom: 1rem;">
+                        <div>
+                            <strong>${t.name}</strong>
+                            <p class="org-id">Parsing Mode: ${t.config.mode}</p>
+                        </div>
+                        <button class="btn btn-danger" onclick="deleteTemplate(${t.id})">Delete</button>
+                    </div>`,
+                    )
+                    .join("");
+            } catch (error) {
+                templatesList.innerHTML = `<p style="color: red;">${error.message}</p>`;
             }
         };
 
-        // Initial load and dynamic styles
-        fetchAndRenderOrgs();
-        const style = document.createElement("style");
-        style.textContent = `
-        .org-card { border: 1px solid var(--color-border); border-radius: 8px; padding: 1rem; display: flex; justify-content: space-between; align-items: center; }
-        .org-id { color: var(--color-text-muted); font-size: 0.9rem; margin-top: 4px; }
-        .status-line { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
-        .status-indicator { width: 10px; height: 10px; border-radius: 50%; background-color: #94a3b8; }
-        .status-text { font-size: 0.85rem; color: var(--color-text-muted); }
-    `;
-        document.head.appendChild(style);
+        window.deleteTemplate = async (templateId) => {
+            if (!confirm("Are you sure you want to delete this template?"))
+                return;
+            try {
+                const response = await apiCall(
+                    `/api/v1/import-templates/${templateId}`,
+                    { method: "DELETE" },
+                );
+                if (!response.ok) throw new Error("Failed to delete.");
+                fetchAndRenderTemplates();
+            } catch (e) {
+                alert("Error deleting template.");
+            }
+        };
+
+        updateConfigFields();
+        fetchAndRenderTemplates();
     }
 
-    // Ensure the onPageLoad function is called from the base template script
-    document.addEventListener("DOMContentLoaded", () => {
-        const token = localStorage.getItem("access_token");
-        // Simplified check to call onPageLoad if it exists for the current page
-        if (typeof onPageLoad === "function") {
-            onPageLoad(token);
-        }
-    });
+    // --- LOGIC FOR MAPPING PROFILES SECTION ---
+    function initMappingProfiles(apiCall) {
+        const newProfileForm = document.getElementById("newMappingProfileForm");
+        const profileNameInput = document.getElementById("profile_name");
+        const rowsContainer = document.getElementById("mapping-rows-container");
+        const addRowBtn = document.getElementById("add-mapping-row-btn");
+        const formStatus = document.getElementById("mapping-form-status");
+        const profilesList = document.getElementById("profiles-list");
+
+        const createMappingRow = (source = "", target = "") => {
+            const row = document.createElement("div");
+            row.className = "mapping-row";
+            row.style.display = "flex";
+            row.style.gap = "1rem";
+            row.innerHTML = `
+                <input type="text" class="source-code" placeholder="Source Code (e.g., A)" value="${source}" required style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; flex-grow: 1;">
+                <select class="target-status" required style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; flex-grow: 1;">
+                    <option value="Present" ${target === "Present" ? "selected" : ""}>Present</option>
+                    <option value="Absent" ${target === "Absent" ? "selected" : ""}>Absent</option>
+                    <option value="On Leave" ${target === "On Leave" ? "selected" : ""}>On Leave</option>
+                    <option value="Half Day" ${target === "Half Day" ? "selected" : ""}>Half Day</option>
+                    <option value="IGNORE" ${target === "IGNORE" ? "selected" : ""}>IGNORE (Skip this code)</option>
+                </select>
+                <button type="button" class="btn btn-danger remove-row-btn" style="padding: 0 12px;">×</button>`;
+            rowsContainer.appendChild(row);
+        };
+
+        addRowBtn.addEventListener("click", () => createMappingRow());
+        rowsContainer.addEventListener("click", (e) => {
+            if (e.target.classList.contains("remove-row-btn")) {
+                e.target.closest(".mapping-row").remove();
+            }
+        });
+
+        newProfileForm.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const submitButton = e.target.querySelector(
+                'button[type="submit"]',
+            );
+            submitButton.disabled = true;
+            submitButton.textContent = "Saving...";
+            formStatus.textContent = "";
+            const mappings = [];
+            rowsContainer.querySelectorAll(".mapping-row").forEach((row) => {
+                const source = row
+                    .querySelector(".source-code")
+                    .value.trim()
+                    .toUpperCase();
+                const target = row.querySelector(".target-status").value;
+                if (source) {
+                    mappings.push({
+                        source_code: source,
+                        target_status: target,
+                    });
+                }
+            });
+            if (mappings.length === 0) {
+                formStatus.textContent =
+                    "Error: Please add at least one mapping rule.";
+                formStatus.style.color = "red";
+                submitButton.disabled = false;
+                submitButton.textContent = "Save New Profile";
+                return;
+            }
+            const payload = {
+                name: profileNameInput.value.trim(),
+                mappings: mappings,
+            };
+            try {
+                const response = await apiCall("/api/v1/mapping-profiles/", {
+                    method: "POST",
+                    body: JSON.stringify(payload),
+                });
+                const data = await response.json();
+                if (!response.ok)
+                    throw new Error(data.detail || "Failed to create profile.");
+                formStatus.textContent = "Profile saved successfully!";
+                formStatus.style.color = "green";
+                newProfileForm.reset();
+                rowsContainer.innerHTML = "";
+                createMappingRow();
+                fetchAndRenderProfiles();
+                setTimeout(() => (formStatus.textContent = ""), 4000);
+            } catch (error) {
+                formStatus.textContent = `Error: ${error.message}`;
+                formStatus.style.color = "red";
+            } finally {
+                submitButton.disabled = false;
+                submitButton.textContent = "Save New Profile";
+            }
+        });
+
+        const renderProfiles = (profiles) => {
+            if (profiles.length === 0) {
+                profilesList.innerHTML = `<p style="color: var(--color-text-muted);">No mapping profiles created yet.</p>`;
+                return;
+            }
+            profilesList.innerHTML = profiles
+                .map(
+                    (p) => `
+                <div class="org-card" style="margin-bottom: 1rem;">
+                    <div>
+                        <strong>${p.name}</strong>
+                        <div style="font-size: 0.8rem; color: #666; margin-top: 8px; display: flex; flex-wrap: wrap; gap: 0.5rem 1rem;">
+                            ${p.mappings.map((m) => `<span>'${m.source_code}' ➜ ${m.target_status}</span>`).join("")}
+                        </div>
+                    </div>
+                    <button class="btn btn-danger" onclick="deleteProfile(${p.id})">Delete</button>
+                </div>
+            `,
+                )
+                .join("");
+        };
+
+        const fetchAndRenderProfiles = async () => {
+            try {
+                const response = await apiCall("/api/v1/mapping-profiles/");
+                if (!response.ok) throw new Error("Failed to fetch profiles.");
+                renderProfiles(await response.json());
+            } catch (error) {
+                profilesList.innerHTML = `<p style="color: red;">${error.message}</p>`;
+            }
+        };
+
+        window.deleteProfile = async (profileId) => {
+            if (!confirm("Are you sure you want to delete this profile?"))
+                return;
+            try {
+                const response = await apiCall(
+                    `/api/v1/mapping-profiles/${profileId}`,
+                    { method: "DELETE" },
+                );
+                if (!response.ok) throw new Error("Failed to delete.");
+                fetchAndRenderProfiles();
+            } catch (e) {
+                alert("Error deleting profile.");
+            }
+        };
+
+        createMappingRow("P", "Present");
+        createMappingRow("A", "Absent");
+        fetchAndRenderProfiles();
+    }
 </script>
 {% endblock %}

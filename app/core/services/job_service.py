@@ -1,3 +1,5 @@
+from typing import Optional
+
 from sqlalchemy.orm import Session
 
 from app.db.models import ConversionJob
@@ -40,6 +42,10 @@ def create_job(
     storage_filename: str,
     target_doctype: str,
     target_org_id: int,
+    import_template_id: Optional[int] = None,
+    mapping_profile_id: Optional[int] = None,
+    attendance_year: Optional[int] = None,  # Add year
+    attendance_month: Optional[int] = None,
 ) -> ConversionJob:
     """Creates a new conversion job record in the database."""
     db_job = ConversionJob(
@@ -48,6 +54,10 @@ def create_job(
         storage_filename=storage_filename,
         target_doctype=target_doctype,
         target_org_id=target_org_id,
+        import_template_id=import_template_id,
+        mapping_profile_id=mapping_profile_id,
+        attendance_year=attendance_year,
+        attendance_month=attendance_month,
         status="UPLOADED",  # Initial status
     )
     db.add(db_job)

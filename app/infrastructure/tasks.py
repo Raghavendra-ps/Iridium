@@ -1,22 +1,25 @@
-# Iridium-main/app/infrastructure/tasks.py
-
 import asyncio
 import json
 import re
-import shutil
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List
 
-import chardet
 import docx
+import httpx
 import pandas as pd
 import PyPDF2
 import pytesseract
 from pdf2image import convert_from_path
 from PIL import Image
+from sqlalchemy.orm import joinedload
 
-from app.db.models import ConversionJob, LinkedOrganization
+from app.db.models import (
+    ConversionJob,
+    ImportTemplate,
+    LinkedOrganization,
+    MappingProfile,
+)
 from app.db.session import SessionLocal
 from app.infrastructure.celery_app import celery
 from app.infrastructure.erpnext_client import ERPNextClient
@@ -25,239 +28,276 @@ UPLOAD_DIR = Path("/app/uploads")
 PROCESSED_DIR = UPLOAD_DIR / "processed"
 
 
-def extract_text_from_any_file(file_path: Path) -> str:
-    """
-    Universal helper to convert any supported file format into a single string of text.
-    """
+def read_tabular_file(file_path: Path, header_row: int = 0) -> pd.DataFrame:
+    """Reads any tabular file (Excel, CSV) into a pandas DataFrame, using the specified header row."""
     ext = file_path.suffix.lower()
-    text_content = ""
+    if ext in [".xlsx", ".xls"]:
+        return pd.read_excel(file_path, header=header_row)
+    elif ext == ".csv":
+        try:
+            return pd.read_csv(
+                file_path, encoding="utf-8", on_bad_lines="skip", header=header_row
+            )
+        except UnicodeDecodeError:
+            return pd.read_csv(
+                file_path, encoding="latin-1", on_bad_lines="skip", header=header_row
+            )
+    raise ValueError(f"Unsupported tabular file format for direct parsing: {ext}")
+
+
+def ocr_to_dataframe(file_path: Path) -> pd.DataFrame:
+    """Converts a PDF or Image file to a text block via OCR, then to a DataFrame."""
+    text = ""
+    ext = file_path.suffix.lower()
+    if ext == ".pdf":
+        try:
+            pages = convert_from_path(str(file_path))
+            for page in pages:
+                text += pytesseract.image_to_string(page) + "\n"
+        except Exception:
+            with open(file_path, "rb") as f:
+                reader = PyPDF2.PdfReader(f)
+                for page in reader.pages:
+                    extracted = page.extract_text()
+                    if extracted:
+                        text += extracted + "\n"
+    elif ext in [".png", ".jpg", ".jpeg", ".tiff", ".bmp"]:
+        text = pytesseract.image_to_string(Image.open(file_path))
+    elif ext == ".docx":
+        doc = docx.Document(file_path)
+        text = "\n".join([para.text for para in doc.paragraphs])
+
+    lines = [
+        re.split(r"\s{2,}", line.strip()) for line in text.splitlines() if line.strip()
+    ]
+    if not lines:
+        return pd.DataFrame()
+
+    header_candidate = max(lines, key=len)
+    header_len = len(header_candidate)
+
+    data = [
+        line
+        for line in lines
+        if len(line) >= header_len - 1 and len(line) <= header_len + 1
+    ]
+
+    return pd.DataFrame(data, columns=header_candidate if data else None)
+
+
+def template_driven_parser(
+    df: pd.DataFrame,
+    config: Dict[str, Any],
+    year: int,
+    month: int,
+    mapping_rules: Dict[str, str] = None,
+) -> List[Dict[str, Any]]:
+    """A single, powerful parser that interprets a DataFrame based on a user-defined template config."""
+    mode = config.get("mode")
+    if not mode:
+        raise ValueError("Import template config is missing required 'mode' key.")
+
+    cleaned_columns = {col: str(col).strip() for col in df.columns}
+    df = df.rename(columns=cleaned_columns)
+
+    records = []
 
     try:
-        # 1. Excel / CSV
-        if ext in [".xlsx", ".xls", ".csv"]:
-            if ext == ".csv":
-                try:
-                    df = pd.read_csv(file_path, encoding="utf-8")
-                except UnicodeDecodeError:
-                    df = pd.read_csv(file_path, encoding="latin-1")
-            else:
-                df = pd.read_excel(file_path)
+        if mode == "DATE_REFERENCE":
+            employee_col = config.get("employee_id_column", "").strip()
+            dates_col = config.get("dates_column", "").strip()
+            status_to_apply = config.get("status_to_apply")
 
-            df.dropna(how="all", inplace=True)
-            # Convert row to string
-            text_list = df.astype(str).apply(lambda x: " ".join(x), axis=1).tolist()
-            text_content = "\n".join(text_list)
+            if not all([employee_col, dates_col, status_to_apply]):
+                raise ValueError(
+                    "DATE_REFERENCE config is missing one of 'employee_id_column', 'dates_column', or 'status_to_apply'."
+                )
 
-        # 2. Word
-        elif ext == ".docx":
-            doc = docx.Document(file_path)
-            text_content = "\n".join([para.text for para in doc.paragraphs])
-            for table in doc.tables:
-                for row in table.rows:
-                    row_text = [cell.text for cell in row.cells]
-                    text_content += "\n" + " ".join(row_text)
+            df = df.dropna(subset=[employee_col, dates_col]).astype(str)
 
-        # 3. PDF
-        elif ext == ".pdf":
-            try:
-                pages = convert_from_path(str(file_path))
-                for page in pages:
-                    text_content += pytesseract.image_to_string(page, config="--psm 6")
-            except Exception as e:
-                print(f"PDF Image OCR failed: {e}. Fallback to text extraction.")
-                with open(file_path, "rb") as f:
-                    reader = PyPDF2.PdfReader(f)
-                    for page in reader.pages:
-                        text_content += page.extract_text() + "\n"
+            for _, row in df.iterrows():
+                emp_code = row[employee_col].strip()
+                dates_str = row[dates_col].strip()
+                date_numbers = re.findall(r"(\d+)", dates_str)
+                for day_str in date_numbers:
+                    try:
+                        date = f"{year}-{month:02d}-{int(day_str):02d}"
+                        datetime.strptime(date, "%Y-%m-%d")
+                        records.append(
+                            {
+                                "employee": emp_code,
+                                "attendance_date": date,
+                                "status": status_to_apply,
+                            }
+                        )
+                    except (ValueError, TypeError):
+                        continue
 
-        # 4. Images
-        elif ext in [".png", ".jpg", ".jpeg", ".tiff", ".bmp"]:
-            text_content = pytesseract.image_to_string(
-                Image.open(file_path), config="--psm 6"
+        elif mode == "MATRIX":
+            employee_col = config.get("employee_id_column", "").strip()
+            start_col_header = str(config.get("start_column", "")).strip()
+
+            if not all([employee_col, start_col_header, mapping_rules is not None]):
+                raise ValueError(
+                    "MATRIX config is missing required keys or a mapping profile is not linked."
+                )
+
+            df = df.dropna(subset=[employee_col]).astype(str)
+
+            if isinstance(df.columns, pd.MultiIndex):
+                df.columns = df.columns.get_level_values(-1)
+                cleaned_columns = {col: str(col).strip() for col in df.columns}
+                df = df.rename(columns=cleaned_columns)
+
+            start_index = df.columns.get_loc(start_col_header)
+            day_columns = df.columns[start_index : start_index + 31]
+
+            for _, row in df.iterrows():
+                emp_code = row[employee_col].strip()
+                for day_header in day_columns:
+                    day_match = re.search(r"(\d+)", str(day_header))
+                    if not day_match:
+                        continue
+                    day = int(day_match.group(1))
+
+                    code = row[day_header].strip().upper()
+                    target_status = mapping_rules.get(code)
+
+                    if target_status and target_status != "IGNORE":
+                        try:
+                            date = f"{year}-{month:02d}-{day:02d}"
+                            datetime.strptime(date, "%Y-%m-%d")
+                            records.append(
+                                {
+                                    "employee": emp_code,
+                                    "attendance_date": date,
+                                    "status": target_status,
+                                }
+                            )
+                        except (ValueError, TypeError):
+                            continue
+        else:
+            raise ValueError(f"Unsupported parsing mode: '{mode}'")
+
+    except KeyError as e:
+        raise KeyError(
+            f"A configured column name was not found in the source file. "
+            f"Missing Column: {e}. "
+            f"Available columns after cleaning are: {df.columns.tolist()}"
+        ) from e
+
+    for record in records:
+        record.setdefault("leave_type", "")
+
+    return records
+
+
+@celery.task
+def process_file_task(job_id: int):
+    """Main Celery task."""
+    db = SessionLocal()
+    job = None
+    try:
+        job = db.query(ConversionJob).filter(ConversionJob.id == job_id).first()
+        if not job:
+            return f"Job {job_id} not found."
+
+        job.status = "PROCESSING"
+        db.commit()
+
+        source_path = UPLOAD_DIR / job.storage_filename
+        PROCESSED_DIR.mkdir(exist_ok=True)
+        raw_json_path = PROCESSED_DIR / f"{source_path.stem}_raw.json"
+        processed_json_path = PROCESSED_DIR / f"{source_path.stem}_processed.json"
+
+        df = pd.DataFrame()
+        file_ext = source_path.suffix.lower()
+
+        header_row = 0
+        template = None
+        mapping_rules = {}
+
+        if job.import_template_id:
+            template = (
+                db.query(ImportTemplate)
+                .filter(ImportTemplate.id == job.import_template_id)
+                .first()
             )
 
-        # 5. JSON
-        elif ext == ".json":
-            with open(file_path, "r") as f:
-                data = json.load(f)
-            if isinstance(data, list):
-                for item in data:
-                    if isinstance(item, dict):
-                        text_content += " ".join([str(v) for v in item.values()]) + "\n"
-                    else:
-                        text_content += str(item) + "\n"
+        if job.mapping_profile_id:
+            profile = (
+                db.query(MappingProfile)
+                .options(joinedload(MappingProfile.mappings))
+                .filter(MappingProfile.id == job.mapping_profile_id)
+                .first()
+            )
+            if profile:
+                mapping_rules = {
+                    m.source_code.upper(): m.target_status for m in profile.mappings
+                }
 
-        # 6. Text
+        if template and template.config:
+            header_row = template.config.get("header_row", 0)
+
+        if file_ext in [".xlsx", ".xls", ".csv"]:
+            df = read_tabular_file(source_path, header_row=header_row)
+        elif file_ext in [".pdf", ".png", ".jpg", ".jpeg", ".docx"]:
+            df = ocr_to_dataframe(source_path)
         else:
-            with open(file_path, "rb") as f:
-                raw_data = f.read()
-                enc = chardet.detect(raw_data)["encoding"] or "utf-8"
-                text_content = raw_data.decode(enc, errors="ignore")
+            raise ValueError(f"Unsupported file type: {file_ext}")
+
+        df.to_json(raw_json_path, orient="records", indent=2)
+
+        extracted_data = []
+        if job.target_doctype.lower() == "attendance":
+            if not template:
+                raise ValueError("Attendance job requires an Import Template.")
+            if not job.attendance_year or not job.attendance_month:
+                raise ValueError("Attendance job is missing Year or Month.")
+
+            extracted_data = template_driven_parser(
+                df=df,
+                config=template.config,
+                year=job.attendance_year,
+                month=job.attendance_month,
+                mapping_rules=mapping_rules,
+            )
+        else:
+            extracted_data = df.to_dict(orient="records")
+
+        with open(processed_json_path, "w", encoding="utf-8") as f:
+            json.dump(extracted_data, f, indent=2, ensure_ascii=False)
+
+        job.raw_data_path = str(raw_json_path)
+        job.processed_data_path = str(processed_json_path)
+        job.status = "AWAITING_VALIDATION"
+        db.commit()
+        return f"Successfully processed {job.original_filename}"
 
     except Exception as e:
-        print(f"Error extracting text from {ext}: {e}")
-
-    return text_content
-
-
-def parse_attendance_text(
-    text: str, year: int = 2025, month: int = 10
-) -> List[Dict[str, Any]]:
-    """
-    Parses OCR text (or converted Excel/Word text) for Attendance.
-    Supports formats:
-    1. "20535 Name P P P"
-    2. "Name EHPL-003 P P P"
-    """
-    records = []
-    lines = text.splitlines()
-
-    print(f"--- DEBUG: Parsing {len(lines)} lines ---")
-
-    # --- IMPROVED REGEX ---
-    # Matches:
-    # 1. 20xxx (Gretis standard)
-    # 2. EHPL-xxx or similar alphanumeric IDs (CSV standard)
-    #    Starts with letters, optional hyphen, ends with digits.
-    row_pattern = re.compile(r"(\b20\d{3}\b|\b[A-Z]{2,5}[-\s]?\d{2,5}\b)")
-
-    for line in lines:
-        if not line.strip():
-            continue
-
-        # 1. Cleanup
-        clean_line = re.sub(r"[|\[\]\{\}_!]", " ", line)
-        # Force space between attendance codes (e.g. PP -> P P)
-        clean_line = re.sub(
-            r"([PLAH])(?=[PLAH])", r"\1 ", clean_line, flags=re.IGNORECASE
-        )
-        # Separate P from OCR noise
-        clean_line = re.sub(r"([P])([lie])", r"\1 ", clean_line)
-        clean_line = re.sub(r"\s+", " ", clean_line).strip()
-
-        # 2. Find Employee Code
-        match = row_pattern.search(clean_line)
-        if not match:
-            continue
-
-        emp_code = match.group(1)
-
-        # 3. Tokenize
-        tokens = clean_line.split()
-
-        # 4. Locate Attendance Block
-        # Heuristic: Pop 'Total' count if exists
-        if tokens and tokens[-1].replace(".", "", 1).isdigit():
-            try:
-                if float(tokens[-1]) > 15:
-                    tokens.pop()
-            except ValueError:
-                pass
-
-        days_in_month = 31
-
-        if len(tokens) < 5:  # Minimal sanity check
-            continue
-
-        # Extract the last 31 tokens as daily statuses
-        # We take AT MOST 31. If text is shorter (e.g. CSV missing columns), take what we have.
-        slice_len = min(len(tokens) - 2, days_in_month)
-        daily_statuses = tokens[-slice_len:]
-
-        # 5. Extract Name (Bidirectional)
-        try:
-            code_idx = tokens.index(emp_code)
-
-            # Scenario A: ID is at start (PDF style) -> Name is AFTER ID
-            if code_idx < 3:
-                att_start_idx = len(tokens) - len(daily_statuses)
-                name_tokens = tokens[code_idx + 1 : att_start_idx]
-                # Filter out 'Sh.', 'Mr.'
-                name_tokens = [
-                    t
-                    for t in name_tokens
-                    if t.lower() not in ["sh.", "mr.", "ms.", "mrs.", "lt."]
-                ]
-                emp_name = " ".join(
-                    name_tokens[:3]
-                )  # Take first 3 words max to avoid noise
-
-            # Scenario B: ID is in middle (CSV style) -> Name is BEFORE ID
-            else:
-                # Name is likely the tokens before the ID
-                name_tokens = tokens[:code_idx]
-                # Filter out 'Mr.' etc
-                name_tokens = [
-                    t
-                    for t in name_tokens
-                    if t.lower() not in ["name", "sr.no", "mr.", "ms."]
-                ]
-                emp_name = " ".join(name_tokens)
-
-            if not emp_name.strip():
-                emp_name = "Unknown"
-
-        except (ValueError, IndexError):
-            emp_name = "Unknown"
-
-        # 6. Process Days
-        for day_idx, status_code in enumerate(daily_statuses):
-            day = day_idx + 1
-            status_code = status_code.upper()
-
-            erp_status = None
-
-            if status_code in ["P", "p", "0"]:  # '0' often appears in Excel for Present
-                continue
-            elif status_code == "L":
-                erp_status = "On Leave"
-            elif status_code == "A":
-                erp_status = "Absent"
-            elif any(x in status_code for x in ["H", "/", "½", "%", "1/2"]):
-                erp_status = "Half Day"
-            elif status_code in [
-                "-",
-                ".",
-                "|",
-                "_",
-                ":",
-                ";",
-                "I",
-                "l",
-                "1",
-                "NAN",
-                "nan",
-            ]:
-                continue
-
-            if erp_status:
-                try:
-                    date_str = f"{year}-{month:02d}-{day:02d}"
-                    records.append(
-                        {
-                            "employee": emp_code,
-                            "employee_name": emp_name,
-                            "attendance_date": date_str,
-                            "status": erp_status,
-                            "shift": "Standard",
-                            "leave_type": "",
-                        }
-                    )
-                except ValueError:
-                    continue
-
-    print(f"--- DEBUG: Extracted {len(records)} records ---")
-    return records
+        if job:
+            db.rollback()
+            job.status = "EXTRACTION_FAILED"
+            job.error_log = {"step": "extraction", "message": str(e)}
+            db.commit()
+        raise
+    finally:
+        db.close()
 
 
 @celery.task(bind=True)
 def submit_to_erpnext_task(self, job_id: int):
-    """
-    Submits the validated data from a conversion job to ERPNext.
-    """
+    """Submits the validated data to ERPNext using a dynamic shift type from the template."""
     db = SessionLocal()
+    job = None
     try:
-        job = db.query(ConversionJob).filter(ConversionJob.id == job_id).first()
+        job = (
+            db.query(ConversionJob)
+            .options(joinedload(ConversionJob.import_template))
+            .filter(ConversionJob.id == job_id)
+            .first()
+        )
+
         if not job:
             return f"Job {job_id} not found."
 
@@ -267,20 +307,29 @@ def submit_to_erpnext_task(self, job_id: int):
             .first()
         )
         if not target_org:
-            raise ValueError(
-                f"Target organization with ID {job.target_org_id} not found for job {job_id}"
+            raise ValueError(f"Target organization not found for job {job_id}")
+
+        shift_type = None  # We will not send shift unless specified
+        if (
+            job.import_template
+            and job.import_template.config
+            and "shift_type" in job.import_template.config
+        ):
+            shift_type = job.import_template.config["shift_type"]
+
+        if shift_type:
+            print(
+                f"--- Using Shift Type: '{shift_type}' for all records in this job ---"
+            )
+        else:
+            print(
+                "--- No Shift Type specified in template. 'shift' field will not be sent. ---"
             )
 
         job.status = "SUBMITTING"
         db.commit()
 
-        if (
-            not job.intermediate_data_path
-            or not Path(job.intermediate_data_path).exists()
-        ):
-            raise FileNotFoundError(f"Validated data file not found for job {job_id}")
-
-        with open(job.intermediate_data_path, "r", encoding="utf-8") as f:
+        with open(job.processed_data_path, "r", encoding="utf-8") as f:
             records = json.load(f)
 
         if not isinstance(records, list):
@@ -296,43 +345,75 @@ def submit_to_erpnext_task(self, job_id: int):
         success_count = 0
         errors = []
 
+        print(f"--- Starting ERPNext Submission for Job ID: {job_id} ---")
+        print(f"Found {total_records} records to submit.")
+
         async def run_submission():
-            nonlocal success_count
+            nonlocal success_count, errors
             for i, record in enumerate(records):
+                error_message_for_this_record = None
+
+                print(
+                    f"--> Processing record {i + 1}/{total_records}: Employee {record.get('employee')} on {record.get('attendance_date')}"
+                )
+
                 try:
+                    # --- START OF CHANGE: Build the payload dynamically ---
                     payload = {
                         "employee": record.get("employee"),
                         "attendance_date": record.get("attendance_date"),
                         "status": record.get("status"),
-                        "shift": record.get("shift", "Standard"),
                         "docstatus": 1,
                     }
+                    # Only add employee_name if it exists in our record
+                    if record.get("employee_name"):
+                        payload["employee_name"] = record.get("employee_name")
 
-                    doctype = (
-                        "Attendance"
-                        if job.target_doctype.lower() == "attendance"
-                        else job.target_doctype
-                    )
+                    # Only add shift if it was defined in the template
+                    if shift_type:
+                        payload["shift"] = shift_type
 
-                    response = await erp_client.create_document(doctype, payload)
+                    # --- ADDED PAYLOAD LOGGING ---
+                    print(f"    PAYLOAD: {json.dumps(payload)}")
+                    # --- END OF CHANGE ---
+
+                    response = await erp_client.create_document("Attendance", payload)
                     response.raise_for_status()
                     success_count += 1
-                except Exception as e:
-                    error_message = str(e)
-                    if hasattr(e, "response") and e.response:
-                        try:
-                            error_data = e.response.json()
-                            error_message = error_data.get("exception", str(error_data))
-                        except json.JSONDecodeError:
-                            error_message = e.response.text[:500]
 
+                except httpx.HTTPStatusError as e:
+                    print(f"!!! FAILED record {i + 1}: HTTP {e.response.status_code}")
+                    try:
+                        error_data = e.response.json()
+                        if "_server_messages" in error_data:
+                            messages = json.loads(error_data["_server_messages"])
+                            error_parts = []
+                            for msg in messages:
+                                if isinstance(msg, dict):
+                                    error_parts.append(str(msg.get("message", msg)))
+                                else:
+                                    error_parts.append(str(msg))
+                            error_message_for_this_record = ". ".join(error_parts)
+                        elif "exception" in error_data:
+                            error_message_for_this_record = error_data.get("exception")
+                        else:
+                            error_message_for_this_record = str(error_data)
+                    except (json.JSONDecodeError, KeyError):
+                        error_message_for_this_record = e.response.text[:500]
+
+                except Exception as e:
+                    print(f"!!! FAILED record {i + 1}: General Exception - {e}")
+                    error_message_for_this_record = str(e)
+
+                if error_message_for_this_record:
                     errors.append(
                         {
                             "record_index": i,
                             "record_data": record,
-                            "error": error_message,
+                            "error": error_message_for_this_record,
                         }
                     )
+                    print(f"    ERROR: {error_message_for_this_record}")
 
                 self.update_state(
                     state="PROGRESS", meta={"current": i + 1, "total": total_records}
@@ -353,69 +434,16 @@ def submit_to_erpnext_task(self, job_id: int):
         job.completed_at = datetime.utcnow()
         db.commit()
 
-        return f"Submission for job {job.id} finished. Success: {success_count}/{total_records}."
+        summary_message = f"Submission for job {job.id} finished. Success: {success_count}/{total_records}."
+        print(f"--- {summary_message} ---")
+        return summary_message
 
     except Exception as e:
-        job.status = "SUBMISSION_FAILED"
-        job.error_log = {"step": "submission_setup", "message": str(e)}
-        db.commit()
-        raise e
-    finally:
-        db.close()
-
-
-@celery.task
-def process_file_task(job_id: int):
-    """
-    The main Celery task for file extraction.
-    """
-    db = SessionLocal()
-    job = db.query(ConversionJob).filter(ConversionJob.id == job_id).first()
-    if not job:
-        return f"Job {job_id} not found."
-
-    try:
-        job.status = "PROCESSING"
-        db.commit()
-
-        source_path = UPLOAD_DIR / job.storage_filename
-        PROCESSED_DIR.mkdir(exist_ok=True)
-
-        json_path = PROCESSED_DIR / f"{source_path.stem}.json"
-
-        # --- UNIVERSAL ATTENDANCE PARSER ---
-        if job.target_doctype.lower() == "attendance":
-            # 1. Convert to text
-            text_content = extract_text_from_any_file(source_path)
-
-            # Debug log
-            print(f"--- EXTRACTED TEXT ({source_path.suffix}) ---")
-            print(text_content[:1000])
-            print("--- END TEXT ---")
-
-            # 2. Parse text with enhanced regex
-            extracted_data = parse_attendance_text(text_content, year=2025, month=10)
-
-        else:
-            # Generic logic fallback
-            text_content = extract_text_from_any_file(source_path)
-            extracted_data = [
-                {"extracted_line": l} for l in text_content.splitlines() if l.strip()
-            ]
-
-        with open(json_path, "w", encoding="utf-8") as f:
-            json.dump(extracted_data, f, indent=2, ensure_ascii=False)
-
-        job.intermediate_data_path = str(json_path)
-        job.status = "AWAITING_VALIDATION"
-        db.commit()
-
-        return f"Successfully processed {job.original_filename} for job {job.id}"
-
-    except Exception as e:
-        job.status = "EXTRACTION_FAILED"
-        job.error_log = {"step": "extraction", "message": str(e)}
-        db.commit()
+        if job:
+            db.rollback()
+            job.status = "SUBMISSION_FAILED"
+            job.error_log = {"step": "submission_setup", "message": str(e)}
+            db.commit()
         raise e
     finally:
         db.close()

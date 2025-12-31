@@ -8,7 +8,16 @@ from fastapi.staticfiles import StaticFiles
 from redis import Redis
 from sqlalchemy.orm import Session
 
-from app.api.endpoints import auth, conversions, organizations, pages, users
+from app.api.endpoints import (
+    auth,
+    conversions,
+    dashboard,
+    mappings,
+    organizations,
+    pages,
+    templates,
+    users,
+)
 from app.core.config import settings
 from app.db.session import get_db
 
@@ -71,7 +80,23 @@ app.include_router(
     prefix=f"{settings.API_V1_STR}/linked-organizations",
     tags=["organizations"],
 )
+app.include_router(
+    dashboard.router,
+    prefix=f"{settings.API_V1_STR}/dashboard",
+    tags=["dashboard"],
+)
 
+app.include_router(
+    mappings.router,
+    prefix=f"{settings.API_V1_STR}/mapping-profiles",
+    tags=["mappings"],
+)
+
+app.include_router(
+    templates.router,
+    prefix=f"{settings.API_V1_STR}/import-templates",
+    tags=["templates"],
+)
 # --- Include Page Routers (HTML serving) ---
 app.include_router(pages.router, tags=["pages"])
 

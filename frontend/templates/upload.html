@@ -1,137 +1,428 @@
-{% extends "dashboard_base.html" %}
-
-{% block title %}New Conversion - Iridium{% endblock %}
-
-{% block content %}
+{% extends "dashboard_base.html" %} {% block title %}New Conversion - Iridium{%
+endblock %} {% block content %}
 <div class="card">
     <h1 class="card-title">New Data Conversion</h1>
-    <p style="margin-bottom: 1.5rem; color: var(--color-text-muted);">
-        Select the type of data you are importing, the target organization, and your source file.
+    <p style="margin-bottom: 1.5rem; color: var(--color-text-muted)">
+        Select the type of data you are importing, the target organization, and
+        your source file.
     </p>
-    <form id="uploadForm" style="display: flex; flex-direction: column; gap: 1.5rem;">
-
+    <form
+        id="uploadForm"
+        style="display: flex; flex-direction: column; gap: 1.5rem"
+    >
         <!-- 1. Import Type Dropdown -->
         <div class="form-group">
-            <label for="import_type" style="display:block; margin-bottom: 8px; font-weight: 500;">Import Type</label>
-            <select id="import_type" name="doctype" required style="width: 100%; padding: 10px; border: 1px solid var(--color-border); border-radius: 8px; background-color: white;">
-                <option value="" disabled selected>-- Select Import Type --</option>
-                <!-- Options populated by JS -->
+            <label
+                for="import_type"
+                style="display: block; margin-bottom: 8px; font-weight: 500"
+                >Import Type</label
+            >
+            <select
+                id="import_type"
+                name="doctype"
+                required
+                style="
+                    width: 100%;
+                    padding: 10px;
+                    border: 1px solid var(--color-border);
+                    border-radius: 8px;
+                    background-color: white;
+                "
+            >
+                <option value="" disabled selected>
+                    -- Select Import Type --
+                </option>
             </select>
         </div>
 
-        <!-- 2. Organization Dropdown -->
+        <!-- 2. Attendance Period Group (initially hidden) -->
+        <div
+            id="attendance-period-group"
+            style="display: none; gap: 1.5rem; grid-template-columns: 1fr 1fr"
+        >
+            <div class="form-group">
+                <label
+                    for="attendance_year"
+                    style="display: block; margin-bottom: 8px; font-weight: 500"
+                    >Attendance Year</label
+                >
+                <select
+                    id="attendance_year"
+                    name="attendance_year"
+                    style="
+                        width: 100%;
+                        padding: 10px;
+                        border: 1px solid var(--color-border);
+                        border-radius: 8px;
+                        background-color: white;
+                    "
+                ></select>
+            </div>
+            <div class="form-group">
+                <label
+                    for="attendance_month"
+                    style="display: block; margin-bottom: 8px; font-weight: 500"
+                    >Attendance Month</label
+                >
+                <select
+                    id="attendance_month"
+                    name="attendance_month"
+                    style="
+                        width: 100%;
+                        padding: 10px;
+                        border: 1px solid var(--color-border);
+                        border-radius: 8px;
+                        background-color: white;
+                    "
+                ></select>
+            </div>
+        </div>
+
+        <!-- 3. Import Template Dropdown (initially hidden) -->
+        <div
+            class="form-group"
+            id="import-template-group"
+            style="display: none"
+        >
+            <label
+                for="import_template_id"
+                style="display: block; margin-bottom: 8px; font-weight: 500"
+                >Import Template</label
+            >
+            <select
+                id="import_template_id"
+                name="import_template_id"
+                style="
+                    width: 100%;
+                    padding: 10px;
+                    border: 1px solid var(--color-border);
+                    border-radius: 8px;
+                    background-color: white;
+                "
+            >
+                <option value="">Loading templates...</option>
+            </select>
+            <div style="font-size: 0.8rem; color: #666; margin-top: 5px">
+                Templates define the file structure and can be managed in
+                <a href="/settings">Settings</a>.
+            </div>
+        </div>
+
+        <!-- 4. Mapping Profile Dropdown (initially hidden) -->
+        <div
+            class="form-group"
+            id="mapping-profile-group"
+            style="display: none"
+        >
+            <label
+                for="mapping_profile_id"
+                style="display: block; margin-bottom: 8px; font-weight: 500"
+                >Attendance Code Mapping</label
+            >
+            <select
+                id="mapping_profile_id"
+                name="mapping_profile_id"
+                style="
+                    width: 100%;
+                    padding: 10px;
+                    border: 1px solid var(--color-border);
+                    border-radius: 8px;
+                    background-color: white;
+                "
+            >
+                <option value="">Loading profiles...</option>
+            </select>
+            <div style="font-size: 0.8rem; color: #666; margin-top: 5px">
+                This is required for MATRIX templates. Profiles are managed in
+                <a href="/settings">Settings</a>.
+            </div>
+        </div>
+
+        <!-- 5. Organization Dropdown -->
         <div class="form-group">
-            <label for="target_org_id" style="display:block; margin-bottom: 8px; font-weight: 500;">Target Organization</label>
-            <select id="target_org_id" name="target_org_id" required style="width: 100%; padding: 10px; border: 1px solid var(--color-border); border-radius: 8px; background-color: white;">
+            <label
+                for="target_org_id"
+                style="display: block; margin-bottom: 8px; font-weight: 500"
+                >Target Organization</label
+            >
+            <select
+                id="target_org_id"
+                name="target_org_id"
+                required
+                style="
+                    width: 100%;
+                    padding: 10px;
+                    border: 1px solid var(--color-border);
+                    border-radius: 8px;
+                    background-color: white;
+                "
+            >
                 <option value="">Loading organizations...</option>
             </select>
         </div>
 
-        <!-- 3. File Input -->
+        <!-- 6. File Input -->
         <div class="form-group">
-             <label for="fileInput" style="display:block; margin-bottom: 8px; font-weight: 500;">Source File</label>
-             <div style="font-size: 0.85rem; color: #666; margin-bottom: 5px;">
-                 Supported: PDF, Excel (.xlsx, .xls), CSV, Word (.docx), Images (.png, .jpg), JSON
-             </div>
-            <input type="file" id="fileInput" name="file" required style="width: 100%; padding: 10px; border: 1px solid var(--color-border); border-radius: 8px;">
+            <label
+                for="fileInput"
+                style="display: block; margin-bottom: 8px; font-weight: 500"
+                >Source File</label
+            >
+            <div style="font-size: 0.85rem; color: #666; margin-bottom: 5px">
+                Supported for Attendance: Excel (.xlsx, .xls), CSV, PDF, Images
+                (.png, .jpg), Word (.docx)
+            </div>
+            <input
+                type="file"
+                id="fileInput"
+                name="file"
+                required
+                style="
+                    width: 100%;
+                    padding: 10px;
+                    border: 1px solid var(--color-border);
+                    border-radius: 8px;
+                "
+            />
         </div>
 
-        <div style="display: flex; justify-content: flex-end; align-items: center; gap: 1rem;">
-            <div id="statusMessage" style="font-size: 0.9rem;"></div>
-            <button type="submit" class="btn" style="background-color: var(--color-accent); color: white;">Upload and Begin</button>
+        <div
+            style="
+                display: flex;
+                justify-content: flex-end;
+                align-items: center;
+                gap: 1rem;
+            "
+        >
+            <div id="statusMessage" style="font-size: 0.9rem"></div>
+            <button
+                type="submit"
+                class="btn"
+                style="background-color: var(--color-accent); color: white"
+            >
+                Upload and Begin
+            </button>
         </div>
     </form>
 </div>
-{% endblock %}
-
-{% block scripts %}
+{% endblock %} {% block scripts %}
 <script>
-document.addEventListener('DOMContentLoaded', async () => {
-    const token = localStorage.getItem('access_token');
-    const orgSelect = document.getElementById('target_org_id');
-    const typeSelect = document.getElementById('import_type');
-
-    // Configuration for Dropdown
-    const importTypes = [
-        { value: 'attendance', label: 'Attendance (Monthly Sheet)' },
-        { value: 'generic', label: 'Generic / Other' }
-    ];
-
-    // Populate Import Types
-    importTypes.forEach(type => {
-        const option = new Option(type.label, type.value);
-        typeSelect.add(option);
-    });
-
-    async function loadOrganizations() {
-        try {
-            const response = await fetch('/api/v1/linked-organizations/', {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (!response.ok) throw new Error('Failed to fetch organizations');
-            const orgs = await response.json();
-
-            orgSelect.innerHTML = '<option value="">-- Select a Target --</option>';
-            if(orgs.length === 0) {
-                 orgSelect.innerHTML = '<option value="">No organizations configured. Please go to Settings.</option>';
-                 orgSelect.disabled = true;
-            } else {
-                orgs.forEach(org => {
-                    const option = new Option(`${org.instance_name} (${org.organization_id})`, org.id);
-                    orgSelect.add(option);
-                });
-            }
-        } catch (error) {
-            orgSelect.innerHTML = `<option value="">Error loading organizations</option>`;
-        }
-    }
-
-    loadOrganizations();
-
-    document.getElementById('uploadForm').addEventListener('submit', async function(event) {
-        event.preventDefault();
-        const form = event.target;
-        const statusMessage = document.getElementById('statusMessage');
-        const submitButton = form.querySelector('button[type="submit"]');
-
-        if (form.file.files.length === 0 || !form.doctype.value || !form.target_org_id.value) {
-            showStatus('Please fill out all fields.', 'error');
+    document.addEventListener("DOMContentLoaded", async () => {
+        const token = localStorage.getItem("access_token");
+        if (!token) {
+            window.location.href = "/login";
             return;
         }
 
-        const formData = new FormData(form);
+        const typeSelect = document.getElementById("import_type");
+        const attendancePeriodGroup = document.getElementById(
+            "attendance-period-group",
+        );
+        const yearSelect = document.getElementById("attendance_year");
+        const monthSelect = document.getElementById("attendance_month");
+        const templateGroup = document.getElementById("import-template-group");
+        const templateSelect = document.getElementById("import_template_id");
+        const mappingGroup = document.getElementById("mapping-profile-group");
+        const mappingSelect = document.getElementById("mapping_profile_id");
+        const orgSelect = document.getElementById("target_org_id");
 
-        submitButton.disabled = true;
-        submitButton.textContent = 'Uploading...';
-        showStatus('Uploading, please wait...', 'info');
+        const apiCall = (url) =>
+            fetch(url, { headers: { Authorization: `Bearer ${token}` } });
 
-        try {
-            const response = await fetch('/api/v1/conversions/upload', {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${token}` },
-                body: formData
+        const importTypes = [
+            { value: "attendance", label: "Attendance" },
+            { value: "generic", label: "Generic / Other" },
+        ];
+        importTypes.forEach((type) =>
+            typeSelect.add(new Option(type.label, type.value)),
+        );
+
+        const currentYear = new Date().getFullYear();
+        for (let i = 0; i < 3; i++) {
+            const year = currentYear - 1 + i;
+            yearSelect.add(new Option(year, year));
+        }
+        yearSelect.value = currentYear;
+
+        const months = [
+            "January",
+            "February",
+            "March",
+            "April",
+            "May",
+            "June",
+            "July",
+            "August",
+            "September",
+            "October",
+            "November",
+            "December",
+        ];
+        months.forEach((month, index) =>
+            monthSelect.add(new Option(month, index + 1)),
+        );
+        monthSelect.value = new Date().getMonth() + 1;
+
+        async function loadOrganizations() {
+            try {
+                const response = await apiCall("/api/v1/linked-organizations/");
+                if (!response.ok)
+                    throw new Error("Failed to fetch organizations");
+                const orgs = await response.json();
+                orgSelect.innerHTML =
+                    '<option value="" disabled selected>-- Select a Target --</option>';
+                if (orgs.length === 0) {
+                    orgSelect.innerHTML =
+                        '<option value="" disabled>No organizations configured. Go to Settings.</option>';
+                    orgSelect.disabled = true;
+                } else {
+                    orgs.forEach((org) =>
+                        orgSelect.add(
+                            new Option(
+                                `${org.instance_name} (${org.organization_id})`,
+                                org.id,
+                            ),
+                        ),
+                    );
+                }
+            } catch (error) {
+                orgSelect.innerHTML = `<option value="">Error loading organizations</option>`;
+            }
+        }
+
+        async function loadImportTemplates() {
+            try {
+                const response = await apiCall("/api/v1/import-templates/");
+                if (!response.ok) throw new Error("Failed to fetch templates");
+                const templates = await response.json();
+
+                templateSelect.innerHTML =
+                    '<option value="" disabled selected>-- Select a Template --</option>';
+                if (templates.length === 0) {
+                    templateSelect.innerHTML =
+                        '<option value="" disabled>No templates found. Create one in Settings.</option>';
+                    templateSelect.disabled = true;
+                } else {
+                    templateSelect.disabled = false;
+                    templates.forEach((template) => {
+                        // --- START OF FIX ---
+                        const mode = template.config.mode || "UNKNOWN";
+                        const option = new Option(
+                            `${template.name} (${mode})`,
+                            template.id,
+                        );
+                        // Store the mode directly on the option element for robust access later
+                        option.dataset.mode = mode;
+                        templateSelect.add(option);
+                        // --- END OF FIX ---
+                    });
+                }
+            } catch (e) {
+                templateSelect.innerHTML = `<option value="">Error loading templates</option>`;
+            }
+        }
+
+        async function loadMappingProfiles() {
+            try {
+                const response = await apiCall("/api/v1/mapping-profiles/");
+                if (!response.ok)
+                    throw new Error("Failed to fetch mapping profiles");
+                const profiles = await response.json();
+                mappingSelect.innerHTML =
+                    '<option value="" disabled selected>-- Select a Mapping Profile --</option>';
+                if (profiles.length === 0) {
+                    mappingSelect.innerHTML =
+                        '<option value="" disabled>No profiles found. Create one in Settings.</option>';
+                    mappingSelect.disabled = true;
+                } else {
+                    mappingSelect.disabled = false;
+                    profiles.forEach((profile) =>
+                        mappingSelect.add(new Option(profile.name, profile.id)),
+                    );
+                }
+            } catch (e) {
+                mappingSelect.innerHTML = `<option value="">Error loading profiles</option>`;
+            }
+        }
+
+        typeSelect.addEventListener("change", (e) => {
+            const isAttendance = e.target.value === "attendance";
+            attendancePeriodGroup.style.display = isAttendance
+                ? "grid"
+                : "none";
+            templateGroup.style.display = isAttendance ? "block" : "none";
+            yearSelect.required = isAttendance;
+            monthSelect.required = isAttendance;
+            templateSelect.required = isAttendance;
+            mappingGroup.style.display = "none";
+            mappingSelect.required = false;
+            if (isAttendance) {
+                loadImportTemplates();
+            }
+        });
+
+        templateSelect.addEventListener("change", (e) => {
+            // --- START OF FIX ---
+            // Read the mode from the data attribute, not the text
+            const selectedOption = e.target.options[e.target.selectedIndex];
+            const selectedMode = selectedOption.dataset.mode;
+            const isMatrixMode = selectedMode === "MATRIX";
+            // --- END OF FIX ---
+
+            mappingGroup.style.display = isMatrixMode ? "block" : "none";
+            mappingSelect.required = isMatrixMode;
+            if (isMatrixMode) {
+                loadMappingProfiles();
+            }
+        });
+
+        loadOrganizations();
+
+        document
+            .getElementById("uploadForm")
+            .addEventListener("submit", async function (event) {
+                event.preventDefault();
+                const form = event.target;
+                const statusMessage = document.getElementById("statusMessage");
+                const submitButton = form.querySelector(
+                    'button[type="submit"]',
+                );
+                if (!form.checkValidity()) {
+                    showStatus("Please fill out all required fields.", "error");
+                    return;
+                }
+                const formData = new FormData(form);
+                submitButton.disabled = true;
+                submitButton.textContent = "Uploading...";
+                showStatus("Uploading, please wait...", "info");
+                try {
+                    const response = await fetch("/api/v1/conversions/upload", {
+                        method: "POST",
+                        headers: { Authorization: `Bearer ${token}` },
+                        body: formData,
+                    });
+                    const data = await response.json();
+                    if (response.ok) {
+                        window.location.href = `/jobs/${data.id}`;
+                    } else {
+                        throw new Error(data.detail || "Upload failed.");
+                    }
+                } catch (error) {
+                    showStatus(error.message, "error");
+                    submitButton.disabled = false;
+                    submitButton.textContent = "Upload and Begin";
+                }
             });
 
-            const data = await response.json();
-
-            if (response.ok) {
-                window.location.href = `/jobs/${data.id}`;
-            } else {
-                showStatus(data.detail || 'Upload failed.', 'error');
-                submitButton.disabled = false;
-                submitButton.textContent = 'Upload and Begin';
-            }
-        } catch (error) {
-            showStatus('Failed to connect to the server.', 'error');
-            submitButton.disabled = false;
-            submitButton.textContent = 'Upload and Begin';
+        function showStatus(message, type) {
+            statusMessage.textContent = message;
+            statusMessage.style.color =
+                type === "error"
+                    ? "red"
+                    : type === "success"
+                      ? "green"
+                      : "black";
         }
     });
-
-    function showStatus(message, type) {
-        statusMessage.textContent = message;
-        statusMessage.style.color = type === 'error' ? 'red' : (type === 'success' ? 'green' : 'black');
-    }
-});
 </script>
 {% endblock %}

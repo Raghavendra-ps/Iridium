@@ -1,9 +1,7 @@
-# Iridium-main/app/api/endpoints/conversions.py
-
 import json
 import uuid
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse, JSONResponse
@@ -23,6 +21,13 @@ UPLOAD_DIR = Path("/app/uploads")
 
 class JobDataSubmission(BaseModel):
     data: List[Dict[str, Any]]
+
+
+class JobStatusResponse(job_schemas.Job):
+    """Extend the Job schema to include dynamic date info for the UI."""
+
+    attendance_year: Optional[int] = None
+    attendance_month: Optional[int] = None
 
 
 @router.get("/", response_model=list[dict])
@@ -53,6 +58,10 @@ def upload_file(
     file: UploadFile = File(...),
     target_org_id: int = Form(...),
     doctype: str = Form(...),
+    import_template_id: Optional[int] = Form(None),
+    mapping_profile_id: Optional[int] = Form(None),
+    attendance_year: Optional[int] = Form(None),
+    attendance_month: Optional[int] = Form(None),
 ):
     """Upload a file, create a job record, and dispatch a background task."""
     UPLOAD_DIR.mkdir(exist_ok=True)
@@ -77,13 +86,17 @@ def upload_file(
         storage_filename=unique_filename,
         target_doctype=doctype,
         target_org_id=target_org_id,
+        mapping_profile_id=mapping_profile_id,
+        import_template_id=import_template_id,
+        attendance_year=attendance_year,
+        attendance_month=attendance_month,
     )
 
     celery.send_task("app.infrastructure.tasks.process_file_task", args=[job.id])
     return job
 
 
-@router.get("/{job_id}/status", response_model=job_schemas.Job)
+@router.get("/{job_id}/status", response_model=JobStatusResponse)
 def get_job_status(
     *,
     db: Session = Depends(get_db),
@@ -97,24 +110,36 @@ def get_job_status(
     return job
 
 
-@router.get("/{job_id}/data")
-def get_job_data(
+@router.get("/{job_id}/data/raw")
+def get_job_raw_data(
     *,
     db: Session = Depends(get_db),
     current_user: User = Depends(dependencies.get_current_user),
     job_id: int,
 ):
-    """Get the processed intermediate JSON data for a job."""
+    """Get the raw, unprocessed tabular data extracted from the source file."""
     job = job_service.get_job_by_id(db=db, job_id=job_id, owner_id=current_user.id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
-    if not job.intermediate_data_path or not Path(job.intermediate_data_path).exists():
-        raise HTTPException(
-            status_code=404,
-            detail="Processed data not found for this job. It may still be processing or failed.",
-        )
+    if not job.raw_data_path or not Path(job.raw_data_path).exists():
+        raise HTTPException(status_code=404, detail="Raw data not found for this job.")
+    return FileResponse(job.raw_data_path, media_type="application/json")
 
-    return FileResponse(job.intermediate_data_path, media_type="application/json")
+
+@router.get("/{job_id}/data/processed")
+def get_job_processed_data(
+    *,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(dependencies.get_current_user),
+    job_id: int,
+):
+    """Get the final, processed data after parsing rules have been applied."""
+    job = job_service.get_job_by_id(db=db, job_id=job_id, owner_id=current_user.id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    if not job.processed_data_path or not Path(job.processed_data_path).exists():
+        raise HTTPException(status_code=404, detail="Processed data not found.")
+    return FileResponse(job.processed_data_path, media_type="application/json")
 
 
 @router.post("/{job_id}/submit", status_code=status.HTTP_202_ACCEPTED)
@@ -138,13 +163,18 @@ def submit_job_for_processing(
             detail=f"Job is not in a submittable state. Current status: {job.status}",
         )
 
-    if not job.intermediate_data_path:
+    # --- START OF FIX ---
+    # Check for the correct column: `processed_data_path` instead of `intermediate_data_path`.
+    if not job.processed_data_path:
         raise HTTPException(
             status_code=404,
-            detail="Intermediate data path not set. The job may not have been processed yet.",
+            detail="Processed data path not set. The job may not have been fully processed yet.",
         )
 
-    validated_data_path = Path(job.intermediate_data_path)
+    # Use the correct path to overwrite with the user's validated data.
+    validated_data_path = Path(job.processed_data_path)
+    # --- END OF FIX ---
+
     try:
         with open(validated_data_path, "w", encoding="utf-8") as f:
             json.dump(submission_data.data, f, indent=2, ensure_ascii=False)
@@ -173,23 +203,29 @@ def delete_job(
     current_user: User = Depends(dependencies.get_current_user),
     job_id: int,
 ):
-    """
-    Delete a conversion job and its associated files.
-    """
+    """Delete a conversion job and its associated files."""
     job = job_service.get_job_by_id(db=db, job_id=job_id, owner_id=current_user.id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
     try:
+        # Delete original uploaded file
         original_file = UPLOAD_DIR / job.storage_filename
         if original_file.exists():
             original_file.unlink()
 
-        if job.intermediate_data_path:
-            processed_file = Path(job.intermediate_data_path)
+        # Delete raw and processed data files
+        if job.raw_data_path:
+            raw_file = Path(job.raw_data_path)
+            if raw_file.exists():
+                raw_file.unlink()
+        if job.processed_data_path:
+            processed_file = Path(job.processed_data_path)
             if processed_file.exists():
                 processed_file.unlink()
+
     except Exception as e:
+        # Log this error but don't block the job deletion from the DB
         print(f"Error deleting files for job {job_id}: {e}")
 
     job_service.delete_job_by_id(db=db, job_id=job_id)
