@@ -1,5 +1,3 @@
-# Iridium-main/app/api/endpoints/templates.py
-
 from typing import List
 
 from fastapi import APIRouter, Depends, status
@@ -13,7 +11,6 @@ from app.db.session import get_db
 
 router = APIRouter()
 
-
 @router.post(
     "/",
     response_model=template_schemas.ImportTemplate,
@@ -25,7 +22,12 @@ def create_import_template(
     current_user: User = Depends(dependencies.get_current_user),
     template_in: template_schemas.ImportTemplateCreate,
 ):
-    """Create a new import template."""
+    """
+    Create a new import template.
+
+    The request body should contain the template's name and its JSON configuration,
+    which defines the parsing rules.
+    """
     return template_service.create_template(
         db=db, owner_id=current_user.id, template_in=template_in
     )
@@ -37,7 +39,9 @@ def list_user_import_templates(
     db: Session = Depends(get_db),
     current_user: User = Depends(dependencies.get_current_user),
 ):
-    """List all import templates for the current user."""
+    """
+    List all import templates belonging to the current authenticated user.
+    """
     return template_service.get_templates_by_owner(db=db, owner_id=current_user.id)
 
 
@@ -48,7 +52,10 @@ def delete_import_template(
     current_user: User = Depends(dependencies.get_current_user),
     template_id: int,
 ):
-    """Delete an import template."""
+    """
+    Delete a specific import template by its ID.
+    """
     return template_service.delete_template(
         db=db, owner_id=current_user.id, template_id=template_id
     )
+    return template_service.delete_template(db=db, owner_id=current_user.id, template_id=template_id)

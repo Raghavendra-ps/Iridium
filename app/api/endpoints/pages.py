@@ -1,5 +1,3 @@
-# Iridium-main/app/api/endpoints/pages.py
-
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
@@ -36,6 +34,33 @@ async def list_jobs_page(request: Request):
     """Serves the page listing all jobs. Data is fetched by JS."""
     return templates.TemplateResponse(
         "jobs_list.html", {"request": request, "active_page": "jobs"}
+    )
+
+
+@router.get(
+    "/jobs/{job_id}/configure", response_class=HTMLResponse, include_in_schema=False
+)
+async def job_configure_page(request: Request, job_id: int):
+    """
+    Serves the new, interactive page for confirming the parsing configuration
+    after a file has been analyzed.
+    """
+    return templates.TemplateResponse(
+        "job_configure.html",
+        {"request": request, "job_id": job_id, "active_page": "jobs"},
+    )
+
+
+@router.get(
+    "/jobs/{job_id}/map-employees", response_class=HTMLResponse, include_in_schema=False
+)
+async def job_map_employees_page(request: Request, job_id: int):
+    """
+    Serves the final step page for mapping extracted employees to ERPNext employees.
+    """
+    return templates.TemplateResponse(
+        "job_map_employees.html",
+        {"request": request, "job_id": job_id, "active_page": "jobs"},
     )
 
 

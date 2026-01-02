@@ -1,5 +1,3 @@
-# Iridium-main/app/main.py
-
 import logging
 
 from fastapi import Depends, FastAPI, HTTPException
@@ -15,25 +13,25 @@ from app.api.endpoints import (
     mappings,
     organizations,
     pages,
-    templates,
     users,
 )
 from app.core.config import settings
 from app.db.session import get_db
 
-# Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Initialize FastAPI app
 app = FastAPI(
-    title="Iridium - Data Conversion Service",
+    title="Gretis DataPort",
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
 )
 
 
-# --- Dependency for Redis Connection ---
+# --- START OF FIX: ADD THE get_redis DEPENDENCY BACK ---
 def get_redis():
+    """
+    Dependency function that provides a Redis client connection.
+    """
     try:
         redis_client = Redis.from_url(settings.REDIS_URI, decode_responses=True)
         redis_client.ping()
@@ -43,7 +41,16 @@ def get_redis():
         raise HTTPException(status_code=503, detail="Could not connect to Redis.")
 
 
-# --- Health Check Endpoint ---
+    try:
+        redis_client = Redis.from_url(settings.REDIS_URI, decode_responses=True)
+        redis_client.ping()
+        yield redis_client
+    except Exception as e:
+        logger.error(f"Could not connect to Redis: {e}")
+        raise HTTPException(status_code=503, detail="Could not connect to Redis.")
+# --- END OF FIX ---
+
+
 @app.get("/health", tags=["Health"])
 def health_check(db: Session = Depends(get_db), redis: Redis = Depends(get_redis)):
     try:
@@ -61,7 +68,6 @@ def health_check(db: Session = Depends(get_db), redis: Redis = Depends(get_redis
     }
 
 
-# --- Root Redirect ---
 @app.get("/", tags=["Root"], include_in_schema=False)
 def read_root():
     return RedirectResponse(url="/home")
@@ -85,21 +91,12 @@ app.include_router(
     prefix=f"{settings.API_V1_STR}/dashboard",
     tags=["dashboard"],
 )
-
 app.include_router(
     mappings.router,
     prefix=f"{settings.API_V1_STR}/mapping-profiles",
     tags=["mappings"],
 )
 
-app.include_router(
-    templates.router,
-    prefix=f"{settings.API_V1_STR}/import-templates",
-    tags=["templates"],
-)
-# --- Include Page Routers (HTML serving) ---
 app.include_router(pages.router, tags=["pages"])
 
-# --- Mount Static Files ---
-# This is required for serving CSS and JS files located in frontend/static
 app.mount("/static", StaticFiles(directory="frontend/static"), name="static")

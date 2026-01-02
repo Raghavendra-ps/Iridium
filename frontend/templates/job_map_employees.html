@@ -1,0 +1,234 @@
+{% extends "dashboard_base.html" %} {% block title %}Map Employees for Job #{{
+job_id }}{% endblock %} {% block content %}
+<div id="mapping-page-container" data-job-id="{{ job_id }}">
+    <div class="card">
+        <h1 class="card-title">Step 3: Map Employees</h1>
+        <p style="color: var(--color-text-muted); margin-bottom: 2rem">
+            Review the suggested mappings between employees found in your file
+            and the employees in ERPNext. Correct any mistakes before final
+            submission.
+        </p>
+
+        <div id="mapping-table-container">
+            <p>Loading employee data...</p>
+        </div>
+
+        <!-- Actions -->
+        <div
+            style="
+                display: flex;
+                justify-content: flex-end;
+                align-items: center;
+                gap: 1rem;
+                margin-top: 2rem;
+                border-top: 1px solid var(--color-border);
+                padding-top: 1.5rem;
+            "
+        >
+            <div
+                id="statusMessage"
+                style="font-size: 0.9rem; flex-grow: 1; color: red"
+            ></div>
+            <button
+                id="submitBtn"
+                class="btn"
+                style="
+                    background-color: var(--color-accent);
+                    color: white;
+                    font-size: 1rem;
+                    padding: 12px 24px;
+                "
+                disabled
+            >
+                Confirm and Submit to ERPNext
+            </button>
+        </div>
+    </div>
+</div>
+
+<style>
+    #mapping-table-container table {
+        width: 100%;
+        border-collapse: collapse;
+        text-align: left;
+    }
+    #mapping-table-container th,
+    #mapping-table-container td {
+        padding: 12px 8px;
+        border-bottom: 1px solid var(--color-border);
+    }
+    #mapping-table-container th {
+        font-weight: 600;
+    }
+    #mapping-table-container select {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid var(--color-border);
+        border-radius: 6px;
+        background-color: white;
+    }
+    .status-indicator {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        margin-right: 8px;
+    }
+    .status-mapped {
+        background-color: #10b981;
+    }
+    .status-unmapped {
+        background-color: #f59e0b;
+    }
+</style>
+{% endblock %} {% block scripts %}
+<script>
+    document.addEventListener("DOMContentLoaded", async function () {
+        const token = localStorage.getItem("access_token");
+        if (!token) {
+            window.location.href = "/login";
+            return;
+        }
+
+        const jobId = document.getElementById("mapping-page-container").dataset
+            .jobId;
+
+        const container = document.getElementById("mapping-table-container");
+        const submitBtn = document.getElementById("submitBtn");
+        const statusMessage = document.getElementById("statusMessage");
+
+        let extractedEmployees = [];
+        let erpEmployees = [];
+        let suggestedMap = {};
+
+        const apiCall = (url) =>
+            fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+
+        async function loadMappingData() {
+            try {
+                const response = await apiCall(
+                    `/api/v1/conversions/${jobId}/employee-map-preview`,
+                );
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(
+                        err.detail || "Failed to load mapping data.",
+                    );
+                }
+                const data = await response.json();
+
+                extractedEmployees = data.extracted_employees;
+                erpEmployees = data.erp_employees;
+                suggestedMap = data.suggested_map;
+
+                renderTable();
+                submitBtn.disabled = false;
+            } catch (error) {
+                container.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+            }
+        }
+
+        function renderTable() {
+            const table = document.createElement("table");
+            table.innerHTML = `
+            <thead>
+                <tr>
+                    <th>Status</th>
+                    <th>Extracted Code</th>
+                    <th>Extracted Name</th>
+                    <th>Map to ERPNext Employee</th>
+                </tr>
+            </thead>
+            <tbody id="mapping-tbody"></tbody>
+        `;
+            container.innerHTML = "";
+            container.appendChild(table);
+
+            const tbody = document.getElementById("mapping-tbody");
+
+            extractedEmployees.forEach((extEmp) => {
+                const row = document.createElement("tr");
+
+                const erpOptions = erpEmployees
+                    .map((erpEmp) => {
+                        const suggestion = suggestedMap[extEmp.code];
+                        const isSelected = suggestion === erpEmp.name;
+                        return `<option value="${erpEmp.name}" ${isSelected ? "selected" : ""}>
+                    ${erpEmp.employee_name} (${erpEmp.name})
+                </option>`;
+                    })
+                    .join("");
+
+                const suggestedValue = suggestedMap[extEmp.code] || "";
+
+                row.innerHTML = `
+                <td><span class="status-indicator ${suggestedValue ? "status-mapped" : "status-unmapped"}"></span></td>
+                <td>${extEmp.code}</td>
+                <td>${extEmp.name}</td>
+                <td>
+                    <select class="erp-employee-select" data-extracted-code="${extEmp.code}">
+                        <option value="">-- Do Not Import --</option>
+                        ${erpOptions}
+                    </select>
+                </td>
+            `;
+                tbody.appendChild(row);
+
+                // Set the selected value after appending, as innerHTML can be tricky
+                const selectEl = row.querySelector(".erp-employee-select");
+                selectEl.value = suggestedValue;
+            });
+        }
+
+        submitBtn.addEventListener("click", async () => {
+            submitBtn.disabled = true;
+            submitBtn.textContent = "Submitting...";
+            statusMessage.textContent = "";
+
+            const employeeMap = {};
+            document
+                .querySelectorAll(".erp-employee-select")
+                .forEach((select) => {
+                    if (select.value) {
+                        // Only include if a mapping is selected
+                        employeeMap[select.dataset.extractedCode] =
+                            select.value;
+                    }
+                });
+
+            const payload = {
+                job_id: parseInt(jobId, 10),
+                employee_map: employeeMap,
+            };
+
+            try {
+                const response = await fetch(
+                    "/api/v1/conversions/submit-with-mapping",
+                    {
+                        method: "POST",
+                        headers: {
+                            Authorization: `Bearer ${token}`,
+                            "Content-Type": "application/json",
+                        },
+                        body: JSON.stringify(payload),
+                    },
+                );
+                const data = await response.json();
+                if (!response.ok)
+                    throw new Error(data.detail || "Final submission failed.");
+
+                alert(
+                    "Job has been queued for final submission. You will be redirected to the job status page.",
+                );
+                window.location.href = `/jobs/${jobId}`;
+            } catch (error) {
+                statusMessage.textContent = `Error: ${error.message}`;
+                submitBtn.disabled = false;
+                submitBtn.textContent = "Confirm and Submit to ERPNext";
+            }
+        });
+
+        loadMappingData();
+    });
+</script>
+{% endblock %}

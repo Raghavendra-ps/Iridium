@@ -1,0 +1,425 @@
+{% extends "dashboard_base.html" %} {% block title %}Configure Job #{{ job_id
+}}{% endblock %} {% block content %}
+<div id="configure-page-container" data-job-id="{{ job_id }}">
+    <div class="card">
+        <h1 class="card-title">Confirm File Configuration</h1>
+        <p style="color: var(--color-text-muted); margin-bottom: 2rem">
+            Our intelligent engine has analyzed your file. Please review and
+            confirm the suggested mappings below before processing the data.
+        </p>
+
+        <!-- Configuration Form -->
+        <form id="configForm">
+            <div
+                style="
+                    display: grid;
+                    grid-template-columns: 1fr 1.5fr;
+                    gap: 2rem;
+                "
+            >
+                <!-- Left Column: Settings -->
+                <div>
+                    <h2 class="form-section-title">Parsing Logic</h2>
+                    <div class="form-group">
+                        <label for="parser_mode">Parsing Mode</label>
+                        <select id="parser_mode" name="mode">
+                            <option value="MATRIX">Matrix (Daily Grid)</option>
+                            <option value="SUMMARY">
+                                Summary (Count-based)
+                            </option>
+                        </select>
+                    </div>
+
+                    <div id="dynamic-config-fields">
+                        <!-- JS will populate this based on the selected mode -->
+                    </div>
+
+                    <h2 class="form-section-title" style="margin-top: 2rem">
+                        Destination
+                    </h2>
+                    <div class="form-group">
+                        <label for="target_org_id">Target Organization</label>
+                        <select
+                            id="target_org_id"
+                            name="target_org_id"
+                            required
+                        >
+                            <option value="">Loading organizations...</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Right Column: Data Preview -->
+                <div>
+                    <h2 class="form-section-title">
+                        File Preview (First 5 Rows)
+                    </h2>
+                    <div
+                        id="data-preview-grid"
+                        style="
+                            width: 100%;
+                            height: 300px;
+                            overflow: hidden;
+                            border: 1px solid var(--color-border);
+                        "
+                    ></div>
+                </div>
+            </div>
+
+            <!-- Actions -->
+            <div
+                style="
+                    display: flex;
+                    justify-content: flex-end;
+                    align-items: center;
+                    gap: 1rem;
+                    margin-top: 2rem;
+                    border-top: 1px solid var(--color-border);
+                    padding-top: 1.5rem;
+                "
+            >
+                <div
+                    id="statusMessage"
+                    style="font-size: 0.9rem; flex-grow: 1; color: red"
+                ></div>
+                <button
+                    type="submit"
+                    class="btn"
+                    style="
+                        background-color: var(--color-accent);
+                        color: white;
+                        font-size: 1rem;
+                        padding: 12px 24px;
+                    "
+                >
+                    Confirm and Process File
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+    .form-section-title {
+        font-size: 1.1rem;
+        font-weight: 600;
+        margin-bottom: 1.5rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid var(--color-border);
+    }
+    .form-group {
+        margin-bottom: 1.5rem;
+    }
+    .form-group label {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: 500;
+        color: var(--color-text);
+    }
+    .form-group select,
+    .form-group input {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid var(--color-border);
+        border-radius: 8px;
+        background-color: white;
+        font-size: 1rem;
+    }
+    .help-text {
+        font-size: 0.85rem;
+        color: var(--color-text-muted);
+        margin-top: 4px;
+    }
+</style>
+{% endblock %} {% block scripts %}
+<script>
+    document.addEventListener("DOMContentLoaded", async function () {
+        const token = localStorage.getItem("access_token");
+        if (!token) {
+            window.location.href = "/login";
+            return;
+        }
+
+        const jobId = document.getElementById("configure-page-container")
+            .dataset.jobId;
+
+        const analysisResult = JSON.parse(
+            sessionStorage.getItem("analysisResult"),
+        );
+        const attendancePeriod = JSON.parse(
+            sessionStorage.getItem("attendancePeriod"),
+        );
+
+        if (!analysisResult || !attendancePeriod) {
+            alert("Analysis data not found. Please re-upload your file.");
+            window.location.href = "/upload";
+            return;
+        }
+
+        const configForm = document.getElementById("configForm");
+        const parserModeSelect = document.getElementById("parser_mode");
+        const dynamicFieldsContainer = document.getElementById(
+            "dynamic-config-fields",
+        );
+        const targetOrgSelect = document.getElementById("target_org_id");
+        const previewGridContainer =
+            document.getElementById("data-preview-grid");
+        const statusMessage = document.getElementById("statusMessage");
+        const submitButton = configForm.querySelector('button[type="submit"]');
+
+        const apiCall = (url) =>
+            fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+
+        // Updated to match new parser's expected config keys
+        const matrixFieldsHTML = `
+        <div class="form-group">
+            <label for="config-header_rows">Header Row(s) (Optional - Auto-detect if blank)</label>
+            <input type="text" id="config-header_rows" name="header_rows" placeholder="Leave blank for auto-detect, or specify: 0, 1, 2, etc.">
+            <div class="help-text">The parser will automatically find headers if left blank</div>
+        </div>
+        <div class="form-group">
+            <label for="config-employee_code_col">Employee Code Column</label>
+            <select id="config-employee_code_col" name="employee_code_col" required></select>
+            <div class="help-text">Column containing employee IDs/codes</div>
+        </div>
+        <div class="form-group">
+            <label for="config-employee_name_col">Employee Name Column (Optional)</label>
+            <select id="config-employee_name_col" name="employee_name_col"><option value="">-- None --</option></select>
+        </div>
+        <div class="form-group">
+            <label for="config-day_start_col">First Day Column</label>
+            <select id="config-day_start_col" name="day_start_col" required></select>
+            <div class="help-text">Column where day 1 starts (e.g., "1", "01", "2024-11-01")</div>
+        </div>
+        <div class="form-group">
+            <label for="config-day_end_col">Last Day Column</label>
+            <select id="config-day_end_col" name="day_end_col" required></select>
+            <div class="help-text">Column where the last day ends (e.g., "30", "31")</div>
+        </div>
+        <div class="form-group">
+            <label for="mapping_profile_id">Code Mapping Profile</label>
+            <select id="mapping_profile_id" name="mapping_profile_id" required></select>
+            <div class="help-text">Maps attendance codes (P, A, L, etc.) to ERPNext statuses</div>
+        </div>`;
+
+        const summaryFieldsHTML = `
+        <div class="form-group">
+            <label for="config-header_rows">Header Row(s) (Optional - Auto-detect if blank)</label>
+            <input type="text" id="config-header_rows" name="header_rows" placeholder="Leave blank for auto-detect">
+            <div class="help-text">The parser will automatically find headers if left blank</div>
+        </div>
+        <div class="form-group">
+            <label for="config-employee_code_col">Employee Code Column</label>
+            <select id="config-employee_code_col" name="employee_code_col" required></select>
+        </div>
+        <div class="form-group">
+            <label for="config-employee_name_col">Employee Name Column (Optional)</label>
+            <select id="config-employee_name_col" name="employee_name_col"><option value="">-- None --</option></select>
+        </div>
+        <hr style="border: none; border-top: 1px solid #eee; margin: 1.5rem 0;">
+        <p style="font-weight: 500; margin-bottom: 1rem;">Map ERPNext statuses to your file's columns:</p>
+        <div class="form-group">
+             <label for="config-map-Present">Present Count Column</label>
+             <select id="config-map-Present"><option value="">-- Not in file --</option></select>
+        </div>
+        <div class="form-group">
+             <label for="config-map-On Leave">On Leave Count Column</label>
+             <select id="config-map-On Leave"><option value="">-- Not in file --</option></select>
+        </div>
+        <div class="form-group">
+             <label for="config-map-Half Day">Half Day Count Column</label>
+             <select id="config-map-Half Day"><option value="">-- Not in file --</option></select>
+        </div>
+         <div class="form-group">
+             <label for="config-map-Absent">Absent Count Column</label>
+             <select id="config-map-Absent"><option value="">-- Not in file --</option></select>
+        </div>`;
+
+        function updateConfigFields() {
+            const mode = parserModeSelect.value;
+            dynamicFieldsContainer.innerHTML =
+                mode === "MATRIX" ? matrixFieldsHTML : summaryFieldsHTML;
+
+            const allColumns = analysisResult.detected_columns;
+            const selects = dynamicFieldsContainer.querySelectorAll("select");
+            selects.forEach((select) => {
+                // Keep first option (if it's a default/placeholder)
+                while (select.options.length > 1) {
+                    select.remove(1);
+                }
+                allColumns.forEach((col) => select.add(new Option(col, col)));
+            });
+
+            const suggestions = analysisResult.suggestions;
+            // Leave header_rows blank for auto-detection by default
+            document.getElementById("config-header_rows").value =
+                suggestions.header_row !== undefined &&
+                suggestions.header_row !== null
+                    ? suggestions.header_row
+                    : "";
+
+            if (suggestions.employee_code_col)
+                document.getElementById("config-employee_code_col").value =
+                    suggestions.employee_code_col;
+
+            if (mode === "MATRIX") {
+                if (suggestions.employee_name_col)
+                    document.getElementById("config-employee_name_col").value =
+                        suggestions.employee_name_col;
+                if (suggestions.day_start_col)
+                    document.getElementById("config-day_start_col").value =
+                        suggestions.day_start_col;
+                if (suggestions.day_end_col)
+                    document.getElementById("config-day_end_col").value =
+                        suggestions.day_end_col;
+                loadMappingProfiles();
+            } else {
+                if (suggestions.employee_name_col)
+                    document.getElementById("config-employee_name_col").value =
+                        suggestions.employee_name_col;
+            }
+        }
+
+        async function loadMappingProfiles() {
+            const select = document.getElementById("mapping_profile_id");
+            if (!select) return;
+            select.innerHTML = '<option value="">Loading profiles...</option>';
+            try {
+                const res = await apiCall("/api/v1/mapping-profiles/");
+                if (!res.ok)
+                    throw new Error("Could not load mapping profiles.");
+                const profiles = await res.json();
+                if (profiles.length === 0) {
+                    select.innerHTML =
+                        '<option value="" disabled>No profiles found. Go to Settings to create one.</option>';
+                } else {
+                    select.innerHTML =
+                        '<option value="" disabled selected>-- Select a Profile --</option>';
+                    profiles.forEach((p) =>
+                        select.add(new Option(p.name, p.id)),
+                    );
+                }
+            } catch (e) {
+                select.innerHTML = `<option value="">Error loading</option>`;
+            }
+        }
+
+        async function loadOrganizations() {
+            try {
+                const response = await apiCall("/api/v1/linked-organizations/");
+                if (!response.ok)
+                    throw new Error("Failed to fetch organizations");
+                const orgs = await response.json();
+                targetOrgSelect.innerHTML =
+                    '<option value="" disabled selected>-- Select a Target --</option>';
+                if (orgs.length === 0) {
+                    targetOrgSelect.innerHTML =
+                        '<option value="" disabled>No organizations configured.</option>';
+                } else {
+                    orgs.forEach((org) =>
+                        targetOrgSelect.add(
+                            new Option(
+                                `${org.instance_name} (${org.organization_id})`,
+                                org.id,
+                            ),
+                        ),
+                    );
+                }
+            } catch (error) {
+                targetOrgSelect.innerHTML = `<option value="">Error loading organizations</option>`;
+            }
+        }
+
+        function renderPreviewGrid() {
+            new Handsontable(previewGridContainer, {
+                data: analysisResult.preview_data,
+                colHeaders: analysisResult.detected_columns,
+                rowHeaders: true,
+                readOnly: true,
+                height: "100%",
+                width: "100%",
+                licenseKey: "non-commercial-and-evaluation",
+            });
+        }
+
+        configForm.addEventListener("submit", async function (event) {
+            event.preventDefault();
+            submitButton.disabled = true;
+            submitButton.textContent = "Processing...";
+            statusMessage.textContent = "";
+
+            const formData = new FormData();
+            formData.append("job_id", jobId);
+            formData.append("target_org_id", targetOrgSelect.value);
+            formData.append("attendance_year", attendancePeriod.year);
+            formData.append("attendance_month", attendancePeriod.month);
+
+            const mode = parserModeSelect.value;
+            const config = { mode: mode };
+
+            // Dynamically gather config based on visible fields
+            document
+                .querySelectorAll(
+                    "#dynamic-config-fields input, #dynamic-config-fields select",
+                )
+                .forEach((input) => {
+                    if (input.name) {
+                        // Handle SUMMARY mode status mapping
+                        if (input.id.startsWith("config-map-")) {
+                            if (!config.status_column_map)
+                                config.status_column_map = {};
+                            if (input.value) {
+                                const status = input.id.replace(
+                                    "config-map-",
+                                    "",
+                                );
+                                config.status_column_map[status] = input.value;
+                            }
+                        } else {
+                            // Only add non-empty values
+                            if (input.value && input.value.trim() !== "") {
+                                config[input.name] = input.value.trim();
+                            }
+                        }
+                    }
+                });
+
+            formData.append("parsing_config", JSON.stringify(config));
+
+            const mappingSelect = document.getElementById("mapping_profile_id");
+            if (mappingSelect && mappingSelect.value) {
+                formData.append("mapping_profile_id", mappingSelect.value);
+            }
+
+            try {
+                const response = await fetch("/api/v1/conversions/process", {
+                    method: "POST",
+                    headers: { Authorization: `Bearer ${token}` },
+                    body: formData,
+                });
+                const data = await response.json();
+                if (!response.ok)
+                    throw new Error(
+                        data.detail || "Failed to start processing.",
+                    );
+
+                // Cleanup session storage before redirecting
+                sessionStorage.removeItem("analysisResult");
+                sessionStorage.removeItem("attendancePeriod");
+
+                window.location.href = `/jobs/${jobId}`;
+            } catch (error) {
+                statusMessage.textContent = error.message;
+                submitButton.disabled = false;
+                submitButton.textContent = "Confirm and Process File";
+            }
+        });
+
+        // --- Initial Page Load ---
+        parserModeSelect.addEventListener("change", updateConfigFields);
+        updateConfigFields();
+        renderPreviewGrid();
+        loadOrganizations();
+    });
+</script>
+{% endblock %}

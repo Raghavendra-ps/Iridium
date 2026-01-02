@@ -1,6 +1,7 @@
 from typing import Optional
 
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.exc import NoResultFound
 
 from app.db.models import ConversionJob
 
@@ -30,8 +31,14 @@ def get_job_by_id(db: Session, *, job_id: int, owner_id: int) -> ConversionJob |
 
 def delete_job_by_id(db: Session, *, job_id: int) -> None:
     """Deletes a job from the database by its ID."""
-    db.query(ConversionJob).filter(ConversionJob.id == job_id).delete()
-    db.commit()
+    try:
+        # We find the job first to ensure we can delete it, then proceed.
+        job_to_delete = db.query(ConversionJob).filter(ConversionJob.id == job_id).one()
+        db.delete(job_to_delete)
+        db.commit()
+    except NoResultFound:
+        # If the job is already gone, our goal is met. Do nothing.
+        pass
 
 
 def create_job(
@@ -41,24 +48,20 @@ def create_job(
     original_filename: str,
     storage_filename: str,
     target_doctype: str,
-    target_org_id: int,
-    import_template_id: Optional[int] = None,
-    mapping_profile_id: Optional[int] = None,
-    attendance_year: Optional[int] = None,  # Add year
-    attendance_month: Optional[int] = None,
+    target_org_id: Optional[int] = None,  # Made optional for initial creation
 ) -> ConversionJob:
-    """Creates a new conversion job record in the database."""
+    """
+    Creates a new, initial conversion job record in the database.
+    More details (like parsing config) will be added in a subsequent step.
+    """
     db_job = ConversionJob(
         owner_id=owner_id,
         original_filename=original_filename,
         storage_filename=storage_filename,
         target_doctype=target_doctype,
         target_org_id=target_org_id,
-        import_template_id=import_template_id,
-        mapping_profile_id=mapping_profile_id,
-        attendance_year=attendance_year,
-        attendance_month=attendance_month,
-        status="UPLOADED",  # Initial status
+        # Status is simply 'UPLOADED' initially
+        status="UPLOADED",
     )
     db.add(db_job)
     db.commit()

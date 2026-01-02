@@ -5,7 +5,6 @@ from app.db.base import Base
 from app.db.models import (
     AttendanceCodeMapping,
     ConversionJob,
-    ImportTemplate,
     LinkedOrganization,
     MappingProfile,
     User,
