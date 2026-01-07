@@ -28,10 +28,13 @@ PROCESSED_DIR = UPLOAD_DIR / "processed"
 
 
 def normalize_emp_code(code: Any) -> str:
-    """Removes common separators and cleans employee codes."""
-    if not isinstance(code, str):
-        code = str(code)
-    return re.sub(r"[\s_-]", "", code).upper()
+    """
+    Sanitizes employee codes by converting to string and stripping whitespace.
+    It no longer removes hyphens or other internal characters.
+    """
+    if not code:
+        return ""
+    return str(code).strip().upper()
 
 
 def _clean_emp_name(name: Any) -> str:

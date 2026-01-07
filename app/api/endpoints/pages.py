@@ -64,6 +64,19 @@ async def job_map_employees_page(request: Request, job_id: int):
     )
 
 
+@router.get(
+    "/jobs/{job_id}/validate", response_class=HTMLResponse, include_in_schema=False
+)
+async def job_validate_page(request: Request, job_id: int):
+    """
+    Serves the data validation page (Step 2) for a job.
+    """
+    return templates.TemplateResponse(
+        "validate_job.html",
+        {"request": request, "job_id": job_id, "active_page": "jobs"},
+    )
+
+
 @router.get("/jobs/{job_id}", response_class=HTMLResponse, include_in_schema=False)
 async def job_detail_page(request: Request, job_id: int):
     """Serves the detail page for a specific job. Data is fetched by JS."""

@@ -13,6 +13,7 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 ALGORITHM = "HS256"
 
+
 def create_access_token(
     subject: Union[str, Any], expires_delta: timedelta = None
 ) -> str:
@@ -23,17 +24,19 @@ def create_access_token(
         expire = datetime.utcnow() + expires_delta
     else:
         # Default token lifespan: 15 minutes
-        expire = datetime.utcnow() + timedelta(minutes=15)
+        expire = datetime.utcnow() + timedelta(hours=8)
 
     to_encode = {"exp": expire, "sub": str(subject)}
     encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
+
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """
     Verifies a plain password against its hashed version.
     """
     return pwd_context.verify(plain_password, hashed_password)
+
 
 def get_password_hash(password: str) -> str:
     """

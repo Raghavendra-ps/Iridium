@@ -1,234 +1,780 @@
-{% extends "dashboard_base.html" %} {% block title %}Map Employees for Job #{{
+{% extends "dashboard_base.html" %} {% block title %}Map Employees - Job #{{
 job_id }}{% endblock %} {% block content %}
-<div id="mapping-page-container" data-job-id="{{ job_id }}">
-    <div class="card">
-        <h1 class="card-title">Step 3: Map Employees</h1>
-        <p style="color: var(--color-text-muted); margin-bottom: 2rem">
-            Review the suggested mappings between employees found in your file
-            and the employees in ERPNext. Correct any mistakes before final
-            submission.
-        </p>
-
-        <div id="mapping-table-container">
-            <p>Loading employee data...</p>
-        </div>
-
-        <!-- Actions -->
+<div
+    class="container"
+    style="
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 20px;
+        height: calc(100vh - 80px);
+        display: flex;
+        flex-direction: column;
+    "
+    data-job-id="{{ job_id }}"
+>
+    <!-- Header -->
+    <div class="card" style="margin-bottom: 20px; flex-shrink: 0">
         <div
             style="
                 display: flex;
-                justify-content: flex-end;
+                justify-content: space-between;
                 align-items: center;
-                gap: 1rem;
-                margin-top: 2rem;
-                border-top: 1px solid var(--color-border);
-                padding-top: 1.5rem;
+            "
+        >
+            <div>
+                <h1 class="card-title">Step 3: Map Employee Codes</h1>
+                <p
+                    style="
+                        color: var(--color-text-muted);
+                        margin-bottom: 0;
+                        font-size: 0.95rem;
+                    "
+                >
+                    Match your company employee codes with ERPNext employee IDs.
+                    Unmapped employees will be skipped.
+                </p>
+            </div>
+            <div style="display: flex; gap: 10px">
+                <button
+                    id="auto-map-btn"
+                    class="btn"
+                    style="
+                        background-color: #6366f1;
+                        color: white;
+                        padding: 10px 20px;
+                    "
+                >
+                    Auto-Map Matches
+                </button>
+                <button
+                    id="clear-all-btn"
+                    class="btn"
+                    style="
+                        background-color: #ef4444;
+                        color: white;
+                        padding: 10px 20px;
+                    "
+                >
+                    Clear All
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading State -->
+    <div
+        id="loading"
+        class="card"
+        style="
+            text-align: center;
+            padding: 60px;
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        "
+    >
+        <div style="display: inline-block">
+            <div class="spinner"></div>
+            <p style="margin-top: 20px; color: #666">
+                Loading employees from ERPNext...
+            </p>
+        </div>
+    </div>
+
+    <!-- Mapping Interface -->
+    <div
+        id="mapping-interface"
+        class="card"
+        style="display: none; flex: 1; flex-direction: column; min-height: 0"
+    >
+        <!-- Search and Filter Bar -->
+        <div
+            style="
+                margin-bottom: 20px;
+                display: flex;
+                gap: 10px;
+                align-items: center;
+                flex-shrink: 0;
+            "
+        >
+            <input
+                type="search"
+                id="search-mapping"
+                placeholder="Search employee codes or names..."
+                style="
+                    flex: 1;
+                    padding: 10px 15px;
+                    border: 1px solid #ddd;
+                    border-radius: 6px;
+                    font-size: 14px;
+                "
+            />
+        </div>
+
+        <!-- Stats Info -->
+        <div
+            style="
+                margin-bottom: 15px;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                flex-shrink: 0;
             "
         >
             <div
-                id="statusMessage"
-                style="font-size: 0.9rem; flex-grow: 1; color: red"
+                id="mapping-stats"
+                style="font-size: 16px; font-weight: 600; color: #374151"
             ></div>
+            <div style="font-size: 14px; color: #6b7280">
+                💡 Tip: Unmapped employees will be skipped and can be processed
+                later
+            </div>
+        </div>
+
+        <!-- Mapping Grid Header -->
+        <div
+            style="
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 20px;
+                padding: 15px;
+                background-color: #f9fafb;
+                border-bottom: 2px solid #e5e7eb;
+                font-weight: 600;
+                color: #374151;
+                flex-shrink: 0;
+            "
+        >
+            <div>Company Employee</div>
+            <div>ERPNext Employee</div>
+        </div>
+
+        <!-- Mapping List -->
+        <div
+            id="mapping-list"
+            style="flex: 1; overflow-y: auto; border-bottom: 1px solid #e5e7eb"
+        ></div>
+
+        <!-- Actions Bar -->
+        <div
+            style="
+                margin-top: 20px;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                flex-shrink: 0;
+            "
+        >
+            <div>
+                <div style="font-size: 14px; color: #6b7280">
+                    <span
+                        id="ready-count"
+                        style="font-weight: 600; color: #059669"
+                        >0</span
+                    >
+                    ready to submit
+                    <span style="margin: 0 8px">•</span>
+                    <span
+                        id="skip-count"
+                        style="font-weight: 600; color: #f59e0b"
+                        >0</span
+                    >
+                    will be skipped
+                </div>
+            </div>
             <button
-                id="submitBtn"
+                id="submit-btn"
                 class="btn"
                 style="
                     background-color: var(--color-accent);
                     color: white;
-                    font-size: 1rem;
-                    padding: 12px 24px;
+                    padding: 14px 30px;
+                    font-size: 16px;
+                    font-weight: 600;
                 "
-                disabled
             >
-                Confirm and Submit to ERPNext
+                Submit to ERPNext
+            </button>
+        </div>
+    </div>
+
+    <!-- Error State -->
+    <div
+        id="error-panel"
+        class="card"
+        style="
+            display: none;
+            background-color: #fff1f2;
+            border-color: #fca5a5;
+            flex: 1;
+            justify-content: center;
+            align-items: center;
+        "
+    >
+        <div style="text-align: center; max-width: 600px">
+            <h3 style="color: #b91c1c; margin-bottom: 10px">
+                ⚠️ Error Loading Data
+            </h3>
+            <p id="error-message" style="color: #991b1b"></p>
+            <button
+                onclick="window.location.reload()"
+                class="btn"
+                style="
+                    margin-top: 15px;
+                    background-color: #6366f1;
+                    color: white;
+                "
+            >
+                Retry
             </button>
         </div>
     </div>
 </div>
 
 <style>
-    #mapping-table-container table {
-        width: 100%;
-        border-collapse: collapse;
-        text-align: left;
-    }
-    #mapping-table-container th,
-    #mapping-table-container td {
-        padding: 12px 8px;
-        border-bottom: 1px solid var(--color-border);
-    }
-    #mapping-table-container th {
-        font-weight: 600;
-    }
-    #mapping-table-container select {
-        width: 100%;
-        padding: 8px;
-        border: 1px solid var(--color-border);
-        border-radius: 6px;
-        background-color: white;
-    }
-    .status-indicator {
-        display: inline-block;
-        width: 10px;
-        height: 10px;
+    .spinner {
+        border: 4px solid #f3f4f6;
+        border-top: 4px solid var(--color-accent);
         border-radius: 50%;
-        margin-right: 8px;
+        width: 40px;
+        height: 40px;
+        animation: spin 1s linear infinite;
     }
-    .status-mapped {
-        background-color: #10b981;
+
+    @keyframes spin {
+        0% {
+            transform: rotate(0deg);
+        }
+        100% {
+            transform: rotate(360deg);
+        }
     }
-    .status-unmapped {
-        background-color: #f59e0b;
+
+    .mapping-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+        padding: 15px;
+        border-bottom: 1px solid #e5e7eb;
+        align-items: center;
+        transition: background-color 0.2s;
+    }
+
+    .mapping-row:hover {
+        background-color: #f9fafb;
+    }
+
+    .mapping-row.mapped {
+        background-color: #f0fdf4;
+    }
+
+    .company-employee {
+        font-weight: 600;
+        color: #1f2937;
+        font-size: 15px;
+    }
+
+    .company-employee-name {
+        font-size: 13px;
+        color: #6b7280;
+        margin-top: 3px;
+    }
+
+    .employee-select {
+        width: 100%;
+        padding: 10px 12px;
+        border: 2px solid #d1d5db;
+        border-radius: 6px;
+        font-size: 14px;
+        background-color: white;
+        cursor: pointer;
+        transition:
+            border-color 0.2s,
+            box-shadow 0.2s;
+    }
+
+    .employee-select:focus {
+        outline: none;
+        border-color: var(--color-accent);
+        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+    }
+
+    .employee-select.mapped {
+        border-color: #10b981;
+        background-color: #f0fdf4;
+    }
+
+    .employee-select option:disabled {
+        color: #9ca3af;
+    }
+
+    .btn {
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-weight: 500;
+        transition:
+            opacity 0.2s,
+            transform 0.1s;
+    }
+
+    .btn:hover:not(:disabled) {
+        opacity: 0.9;
+        transform: translateY(-1px);
+    }
+
+    .btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    .btn:active:not(:disabled) {
+        transform: translateY(0);
     }
 </style>
-{% endblock %} {% block scripts %}
+
 <script>
     document.addEventListener("DOMContentLoaded", async function () {
-        const token = localStorage.getItem("access_token");
-        if (!token) {
+        const getToken = () => localStorage.getItem("access_token");
+
+        if (!getToken()) {
             window.location.href = "/login";
             return;
         }
 
-        const jobId = document.getElementById("mapping-page-container").dataset
-            .jobId;
+        const containerEl = document.querySelector("[data-job-id]");
+        const jobId = containerEl
+            ? containerEl.dataset.jobId
+            : window.location.pathname.match(/\/jobs\/(\d+)\//)?.[1];
 
-        const container = document.getElementById("mapping-table-container");
-        const submitBtn = document.getElementById("submitBtn");
-        const statusMessage = document.getElementById("statusMessage");
+        console.log("🔍 Job ID extracted:", jobId);
 
-        let extractedEmployees = [];
-        let erpEmployees = [];
-        let suggestedMap = {};
-
-        const apiCall = (url) =>
-            fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-
-        async function loadMappingData() {
-            try {
-                const response = await apiCall(
-                    `/api/v1/conversions/${jobId}/employee-map-preview`,
-                );
-                if (!response.ok) {
-                    const err = await response.json();
-                    throw new Error(
-                        err.detail || "Failed to load mapping data.",
-                    );
-                }
-                const data = await response.json();
-
-                extractedEmployees = data.extracted_employees;
-                erpEmployees = data.erp_employees;
-                suggestedMap = data.suggested_map;
-
-                renderTable();
-                submitBtn.disabled = false;
-            } catch (error) {
-                container.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
-            }
+        if (!jobId) {
+            console.error("❌ Job ID not found");
+            alert("Error: Job ID not found. Redirecting to jobs list.");
+            window.location.href = "/jobs";
+            return;
         }
 
-        function renderTable() {
-            const table = document.createElement("table");
-            table.innerHTML = `
-            <thead>
-                <tr>
-                    <th>Status</th>
-                    <th>Extracted Code</th>
-                    <th>Extracted Name</th>
-                    <th>Map to ERPNext Employee</th>
-                </tr>
-            </thead>
-            <tbody id="mapping-tbody"></tbody>
-        `;
-            container.innerHTML = "";
-            container.appendChild(table);
+        // Hide sidebar for full-width view
+        const sidebar = document.querySelector(".sidebar");
+        const mainContent = document.querySelector(".main-content");
+        if (sidebar && mainContent) {
+            sidebar.style.display = "none";
+            mainContent.style.width = "100%";
+            mainContent.style.maxWidth = "100%";
+            mainContent.parentElement.style.gap = "0";
+        }
 
-            const tbody = document.getElementById("mapping-tbody");
+        const loadingEl = document.getElementById("loading");
+        const mappingInterface = document.getElementById("mapping-interface");
+        const errorPanel = document.getElementById("error-panel");
+        const errorMessage = document.getElementById("error-message");
+        const mappingList = document.getElementById("mapping-list");
+        const submitBtn = document.getElementById("submit-btn");
+        const mappingStats = document.getElementById("mapping-stats");
+        const readyCount = document.getElementById("ready-count");
+        const skipCount = document.getElementById("skip-count");
+        const searchInput = document.getElementById("search-mapping");
+        const autoMapBtn = document.getElementById("auto-map-btn");
+        const clearAllBtn = document.getElementById("clear-all-btn");
 
-            extractedEmployees.forEach((extEmp) => {
-                const row = document.createElement("tr");
+        let employeeMap = {};
+        let companyEmployees = [];
+        let erpnextEmployees = [];
 
-                const erpOptions = erpEmployees
-                    .map((erpEmp) => {
-                        const suggestion = suggestedMap[extEmp.code];
-                        const isSelected = suggestion === erpEmp.name;
-                        return `<option value="${erpEmp.name}" ${isSelected ? "selected" : ""}>
-                    ${erpEmp.employee_name} (${erpEmp.name})
-                </option>`;
-                    })
-                    .join("");
+        const apiCall = async (url, options = {}) => {
+            const token = getToken();
+            if (!token) {
+                alert("Session expired. Please login again.");
+                window.location.href = "/login";
+                throw new Error("No token");
+            }
 
-                const suggestedValue = suggestedMap[extEmp.code] || "";
-
-                row.innerHTML = `
-                <td><span class="status-indicator ${suggestedValue ? "status-mapped" : "status-unmapped"}"></span></td>
-                <td>${extEmp.code}</td>
-                <td>${extEmp.name}</td>
-                <td>
-                    <select class="erp-employee-select" data-extracted-code="${extEmp.code}">
-                        <option value="">-- Do Not Import --</option>
-                        ${erpOptions}
-                    </select>
-                </td>
-            `;
-                tbody.appendChild(row);
-
-                // Set the selected value after appending, as innerHTML can be tricky
-                const selectEl = row.querySelector(".erp-employee-select");
-                selectEl.value = suggestedValue;
+            const response = await fetch(url, {
+                ...options,
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    ...options.headers,
+                },
             });
+
+            if (response.status === 401) {
+                localStorage.removeItem("access_token");
+                alert("Session expired. Please login again.");
+                window.location.href = "/login";
+                throw new Error("Session expired");
+            }
+
+            return response;
+        };
+
+        // Load all data
+        try {
+            console.log(`📊 Fetching employee data for job ${jobId}...`);
+
+            const erpRes = await apiCall(
+                `/api/v1/conversions/${jobId}/erpnext-employees`,
+            );
+
+            if (!erpRes.ok) {
+                const errorText = await erpRes.text();
+                console.error("❌ API error:", errorText);
+                throw new Error(
+                    `Failed to load employees (${erpRes.status}): ${errorText}`,
+                );
+            }
+
+            const employeeData = await erpRes.json();
+
+            console.log("✅ Employee data received:", employeeData);
+
+            companyEmployees = employeeData.extracted_employees || [];
+            erpnextEmployees = employeeData.erpnext_employees || [];
+
+            if (companyEmployees.length === 0) {
+                throw new Error("No employees found in processed data");
+            }
+
+            if (erpnextEmployees.length === 0) {
+                throw new Error("No employees found in ERPNext");
+            }
+
+            console.log(
+                `✅ Loaded ${companyEmployees.length} company employees and ${erpnextEmployees.length} ERPNext employees`,
+            );
+            console.log("📋 Sample company employee:", companyEmployees[0]);
+            console.log("📋 Sample ERPNext employee:", erpnextEmployees[0]);
+
+            renderMappingInterface();
+
+            loadingEl.style.display = "none";
+            mappingInterface.style.display = "flex";
+        } catch (e) {
+            console.error("❌ Load error:", e);
+            loadingEl.style.display = "none";
+            errorPanel.style.display = "flex";
+            errorMessage.textContent = e.message;
         }
 
-        submitBtn.addEventListener("click", async () => {
-            submitBtn.disabled = true;
-            submitBtn.textContent = "Submitting...";
-            statusMessage.textContent = "";
+        function renderMappingInterface() {
+            mappingList.innerHTML = companyEmployees
+                .map((emp) => {
+                    const sanitizedCode = String(emp.code).replace(
+                        /"/g,
+                        "&quot;",
+                    );
+                    return `
+                <div class="mapping-row" data-code="${sanitizedCode}">
+                    <div>
+                        <div class="company-employee">${emp.code}</div>
+                        <div class="company-employee-name">${emp.name || emp.code}</div>
+                    </div>
+                    <div>
+                        <select class="employee-select" data-company-code="${sanitizedCode}">
+                            <option value="">-- Select ERPNext Employee (or skip) --</option>
+                            ${erpnextEmployees
+                                .map((erpEmp) => {
+                                    const displayText = erpEmp.employee_number
+                                        ? `${erpEmp.name} - ${erpEmp.employee_name} [${erpEmp.employee_number}]`
+                                        : `${erpEmp.name} - ${erpEmp.employee_name}`;
+                                    return `<option value="${erpEmp.name}">${displayText}</option>`;
+                                })
+                                .join("")}
+                        </select>
+                    </div>
+                </div>
+            `;
+                })
+                .join("");
 
-            const employeeMap = {};
-            document
-                .querySelectorAll(".erp-employee-select")
-                .forEach((select) => {
-                    if (select.value) {
-                        // Only include if a mapping is selected
-                        employeeMap[select.dataset.extractedCode] =
-                            select.value;
+            // Add change listeners to all select dropdowns
+            document.querySelectorAll(".employee-select").forEach((select) => {
+                select.addEventListener("change", (e) => {
+                    const companyCode = e.target.dataset.companyCode;
+                    const erpnextId = e.target.value;
+
+                    if (erpnextId) {
+                        employeeMap[companyCode] = erpnextId;
+                        e.target.classList.add("mapped");
+                        e.target
+                            .closest(".mapping-row")
+                            .classList.add("mapped");
+                    } else {
+                        delete employeeMap[companyCode];
+                        e.target.classList.remove("mapped");
+                        e.target
+                            .closest(".mapping-row")
+                            .classList.remove("mapped");
                     }
+
+                    updateStats();
                 });
+            });
 
-            const payload = {
-                job_id: parseInt(jobId, 10),
-                employee_map: employeeMap,
-            };
+            updateStats();
+        }
 
-            try {
-                const response = await fetch(
-                    "/api/v1/conversions/submit-with-mapping",
-                    {
-                        method: "POST",
-                        headers: {
-                            Authorization: `Bearer ${token}`,
-                            "Content-Type": "application/json",
-                        },
-                        body: JSON.stringify(payload),
-                    },
-                );
-                const data = await response.json();
-                if (!response.ok)
-                    throw new Error(data.detail || "Final submission failed.");
+        function updateStats() {
+            const mapped = Object.keys(employeeMap).length;
+            const total = companyEmployees.length;
+            const skipped = total - mapped;
 
-                alert(
-                    "Job has been queued for final submission. You will be redirected to the job status page.",
-                );
-                window.location.href = `/jobs/${jobId}`;
-            } catch (error) {
-                statusMessage.textContent = `Error: ${error.message}`;
+            mappingStats.textContent = `${mapped} of ${total} employees mapped`;
+            readyCount.textContent = mapped;
+            skipCount.textContent = skipped;
+
+            if (mapped > 0) {
                 submitBtn.disabled = false;
-                submitBtn.textContent = "Confirm and Submit to ERPNext";
+                submitBtn.textContent = `Submit ${mapped} Mapped Employee${mapped > 1 ? "s" : ""} to ERPNext`;
+                mappingStats.style.color = "#059669";
+            } else {
+                submitBtn.disabled = true;
+                submitBtn.textContent = "Map at least one employee to submit";
+                mappingStats.style.color = "#f59e0b";
             }
+        }
+
+        // Search functionality
+        searchInput.addEventListener("input", (e) => {
+            const query = e.target.value.toLowerCase();
+            document.querySelectorAll(".mapping-row").forEach((row) => {
+                const text = row.textContent.toLowerCase();
+                row.style.display = text.includes(query) ? "" : "none";
+            });
         });
 
-        loadMappingData();
+        // Auto-map functionality with PRIORITY: employee_number first, name second
+        autoMapBtn.addEventListener("click", () => {
+            console.log("\n" + "=".repeat(80));
+            console.log("🔍 STARTING AUTO-MAP");
+            console.log("=".repeat(80));
+            console.log("📋 Matching strategy:");
+            console.log(
+                "   1️⃣  PRIORITY: Match by employee_number field (exact match)",
+            );
+            console.log(
+                "   2️⃣  FALLBACK: Match by name (only if employee_number didn't match)",
+            );
+            console.log("   ℹ️  Name is IGNORED if employee_number matches");
+            console.log("");
+
+            let autoMapped = 0;
+            let notMapped = [];
+
+            function normalizedName(name) {
+                return String(name || "")
+                    .toLowerCase()
+                    .trim()
+                    .replace(/\s+/g, " ")
+                    .replace(/[.,]/g, "");
+            }
+
+            companyEmployees.forEach((compEmp, index) => {
+                const compCode = String(compEmp.code).trim();
+                const compName = String(compEmp.name || "").trim();
+                const compNameNorm = normalizedName(compName);
+
+                if (employeeMap[compCode]) {
+                    console.log(
+                        `⏭️  [${index + 1}/${companyEmployees.length}] ${compCode} - Already mapped`,
+                    );
+                    return;
+                }
+
+                console.log(
+                    `\n🔍 [${index + 1}/${companyEmployees.length}] Trying to map: "${compCode}" | "${compName}"`,
+                );
+
+                let match = null;
+                let matchMethod = "";
+
+                // PRIORITY 1: Match by employee_number field
+                match = erpnextEmployees.find((erpEmp) => {
+                    const erpNumber = String(
+                        erpEmp.employee_number || "",
+                    ).trim();
+                    if (erpNumber && erpNumber === compCode) {
+                        console.log(
+                            `   ✅ MATCHED by employee_number: "${compCode}" === "${erpNumber}"`,
+                        );
+                        return true;
+                    }
+                    return false;
+                });
+
+                if (match) {
+                    matchMethod = "employee_number (PRIORITY)";
+                    console.log(
+                        `   ✅ Matched: ${match.name} (${match.employee_name})`,
+                    );
+
+                    const erpNameNorm = normalizedName(match.employee_name);
+                    if (erpNameNorm !== compNameNorm) {
+                        console.log(
+                            `   ℹ️  Note: Names differ - Excel: "${compName}" vs ERPNext: "${match.employee_name}"`,
+                        );
+                        console.log(
+                            `   ℹ️  Using this mapping anyway because employee_number matched`,
+                        );
+                    }
+                }
+
+                // FALLBACK: Match by name if employee_number didn't match
+                if (!match && compNameNorm) {
+                    console.log(
+                        `   ⚠️  No employee_number match, trying name match...`,
+                    );
+
+                    match = erpnextEmployees.find((erpEmp) => {
+                        const erpNameNorm = normalizedName(
+                            erpEmp.employee_name,
+                        );
+                        return erpNameNorm && erpNameNorm === compNameNorm;
+                    });
+
+                    if (match) {
+                        matchMethod = "name (fallback)";
+                        console.log(
+                            `   ✅ Matched by name: ${match.name} (${match.employee_name})`,
+                        );
+                    }
+                }
+
+                if (match) {
+                    employeeMap[compCode] = match.name;
+                    const select = document.querySelector(
+                        `select[data-company-code="${compCode.replace(/"/g, "&quot;")}"]`,
+                    );
+                    if (select) {
+                        select.value = match.name;
+                        select.classList.add("mapped");
+                        select.closest(".mapping-row").classList.add("mapped");
+                    }
+                    autoMapped++;
+                    console.log(
+                        `   ✅ Successfully mapped via ${matchMethod}!`,
+                    );
+                } else {
+                    notMapped.push({ code: compCode, name: compName });
+                    console.log(`   ❌ NO MATCH FOUND - will be skipped`);
+
+                    const similarCodes = erpnextEmployees
+                        .filter(
+                            (e) =>
+                                e.employee_number &&
+                                e.employee_number.substring(0, 4) ===
+                                    compCode.substring(0, 4),
+                        )
+                        .slice(0, 3);
+
+                    if (similarCodes.length > 0) {
+                        console.log(
+                            `   💡 Similar employee numbers in ERPNext:`,
+                        );
+                        similarCodes.forEach((e) =>
+                            console.log(
+                                `      - ${e.employee_number}: ${e.employee_name} (${e.name})`,
+                            ),
+                        );
+                    }
+                }
+            });
+
+            updateStats();
+
+            console.log("\n" + "=".repeat(80));
+            console.log(
+                `✅ AUTO-MAP COMPLETE: ${autoMapped}/${companyEmployees.length} mapped`,
+            );
+            if (notMapped.length > 0) {
+                console.log(`\n⚠️  WILL BE SKIPPED (${notMapped.length}):`);
+                notMapped.forEach((emp) =>
+                    console.log(`   - ${emp.code}: "${emp.name}"`),
+                );
+            }
+            console.log("=".repeat(80) + "\n");
+
+            alert(
+                `Auto-mapped ${autoMapped} of ${companyEmployees.length} employees.\n\n${notMapped.length > 0 ? `⚠️ ${notMapped.length} employees will be skipped. You can manually map them or proceed without them.` : "🎉 All employees matched successfully!"}`,
+            );
+        });
+
+        // Clear all mappings
+        clearAllBtn.addEventListener("click", () => {
+            if (!confirm("Are you sure you want to clear all mappings?"))
+                return;
+
+            employeeMap = {};
+            document.querySelectorAll(".employee-select").forEach((select) => {
+                select.value = "";
+                select.classList.remove("mapped");
+                select.closest(".mapping-row").classList.remove("mapped");
+            });
+            updateStats();
+        });
+
+        // Submit with mapping (ALLOWS PARTIAL SUBMISSION)
+        submitBtn.addEventListener("click", async () => {
+            const mapped = Object.keys(employeeMap).length;
+            const total = companyEmployees.length;
+            const skipped = total - mapped;
+
+            if (mapped === 0) {
+                alert("Please map at least one employee before submitting.");
+                return;
+            }
+
+            const confirmMsg =
+                skipped > 0
+                    ? `Submit ${mapped} mapped employees?\n\n⚠️ ${skipped} unmapped employees will be SKIPPED and can be processed later.`
+                    : `Submit all ${mapped} employees to ERPNext?`;
+
+            if (!confirm(confirmMsg)) {
+                return;
+            }
+
+            submitBtn.disabled = true;
+            submitBtn.textContent = "Submitting to ERPNext...";
+
+            try {
+                console.log("📤 Submitting employee mapping:", employeeMap);
+
+                const res = await apiCall(
+                    `/api/v1/conversions/submit-with-mapping`,
+                    {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            job_id: parseInt(jobId),
+                            employee_map: employeeMap,
+                        }),
+                    },
+                );
+
+                if (!res.ok) {
+                    const error = await res.json();
+                    throw new Error(error.detail || "Submission failed");
+                }
+
+                const result = await res.json();
+                console.log("✅ Submission result:", result);
+
+                const successMsg =
+                    skipped > 0
+                        ? `✅ Successfully submitted ${mapped} employees!\n\n⚠️ ${skipped} employees were skipped.`
+                        : `✅ Successfully submitted all ${mapped} employees!`;
+
+                alert(successMsg);
+                window.location.href = "/jobs";
+            } catch (e) {
+                console.error("❌ Submit error:", e);
+                alert("❌ Error: " + e.message);
+                submitBtn.disabled = false;
+                updateStats();
+            }
+        });
     });
 </script>
 {% endblock %}

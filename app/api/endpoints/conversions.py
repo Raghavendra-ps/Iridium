@@ -193,6 +193,137 @@ async def get_employee_map_preview(
     }
 
 
+@router.get("/{job_id}/erpnext-employees")
+async def get_erpnext_employees_for_mapping(
+    *,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(dependencies.get_current_user),
+    job_id: int,
+):
+    """
+    Fetch both extracted and ERPNext employees for mapping UI.
+    Includes debug logging and connection testing.
+    """
+    print("\n" + "=" * 80)
+    print(f"🔍 EMPLOYEE MAPPING - Starting fetch for Job ID: {job_id}")
+    print("=" * 80)
+
+    # Get job
+    job = job_service.get_job_by_id(db=db, job_id=job_id, owner_id=current_user.id)
+    if not job:
+        print("❌ ERROR: Job not found")
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    if not job.processed_data_path or not Path(job.processed_data_path).exists():
+        print(f"❌ ERROR: Processed data path not found: {job.processed_data_path}")
+        raise HTTPException(status_code=404, detail="Processed job data not found")
+
+    print(f"✅ Job found: {job.original_filename}")
+    print(f"📁 Processed data path: {job.processed_data_path}")
+
+    # Get target organization
+    org = (
+        db.query(LinkedOrganization)
+        .filter(LinkedOrganization.id == job.target_org_id)
+        .first()
+    )
+
+    if not org:
+        print(f"❌ ERROR: Organization not found (ID: {job.target_org_id})")
+        raise HTTPException(status_code=404, detail="Target organization not found")
+
+    print(f"✅ Organization found: ID {org.id}")
+    print(f"🌐 ERPNext URL: {org.erpnext_url}")
+    print(f"🔑 API Key: {org.api_key[:15]}...{org.api_key[-5:]}")
+    print(f"🔒 API Secret: {org.api_secret[:15]}...{org.api_secret[-5:]}")
+
+    # Load extracted employees from processed data
+    print("\n📊 Loading extracted employees from processed data...")
+    try:
+        with open(job.processed_data_path, "r", encoding="utf-8") as f:
+            processed_data = json.load(f)
+
+        extracted = {}
+        for rec in processed_data:
+            emp_code = rec.get("employee")
+            if emp_code and emp_code not in extracted:
+                extracted[emp_code] = rec.get("employee_name", emp_code)
+
+        print(f"✅ Found {len(extracted)} unique employees in processed data")
+        print(f"📋 Sample codes: {list(extracted.keys())[:5]}")
+
+    except Exception as e:
+        print(f"❌ ERROR loading processed data: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to load processed data: {str(e)}"
+        )
+
+    # Create ERPNext client
+    print("\n🔗 Creating ERPNext client...")
+    erp_client = ERPNextClient(
+        base_url=org.erpnext_url, api_key=org.api_key, api_secret=org.api_secret
+    )
+
+    # Test connection first
+    print("🧪 Testing ERPNext connection...")
+    try:
+        connection_test = await erp_client.check_connection()
+        print(f"Connection test result: {connection_test}")
+
+        if connection_test["status"] != "online":
+            print(f"❌ Connection test failed: {connection_test['details']}")
+            raise HTTPException(
+                status_code=503,
+                detail=f"ERPNext connection failed: {connection_test['details']}",
+            )
+
+        print("✅ ERPNext connection successful!")
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Connection test error: {str(e)}")
+        raise HTTPException(
+            status_code=503, detail=f"ERPNext connection error: {str(e)}"
+        )
+
+    # Fetch ERPNext employees
+    print("\n👥 Fetching employees from ERPNext...")
+    try:
+        erp_employees = await erp_client.get_all_employees()
+        print(f"✅ Successfully fetched {len(erp_employees)} employees from ERPNext")
+
+        if len(erp_employees) > 0:
+            print(f"📋 Sample ERPNext employee: {erp_employees[0]}")
+        else:
+            print("⚠️ WARNING: No employees found in ERPNext!")
+
+    except Exception as e:
+        print(f"❌ ERROR fetching ERPNext employees: {str(e)}")
+        import traceback
+
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=503, detail=f"Failed to fetch ERPNext employees: {str(e)}"
+        )
+
+    # Prepare response
+    response_data = {
+        "extracted_employees": [
+            {"code": code, "name": name} for code, name in extracted.items()
+        ],
+        "erpnext_employees": erp_employees,
+        "job_id": job_id,
+    }
+
+    print("\n✅ SUCCESS - Returning data to frontend")
+    print(f"📤 Extracted employees: {len(response_data['extracted_employees'])}")
+    print(f"📤 ERPNext employees: {len(response_data['erpnext_employees'])}")
+    print("=" * 80 + "\n")
+
+    return response_data
+
+
 @router.post("/submit-with-mapping", status_code=status.HTTP_202_ACCEPTED)
 def submit_with_mapping(
     *,
@@ -321,3 +452,39 @@ def delete_job(
         print(f"Error deleting files for job {job_id}: {e}")
     job_service.delete_job_by_id(db=db, job_id=job_id)
     return None
+
+
+# Add to conversions.py
+@router.get("/{job_id}/test-erpnext-connection")
+async def test_erpnext_connection(
+    *,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(dependencies.get_current_user),
+    job_id: int,
+):
+    """Debug endpoint to test ERPNext connection"""
+    job = job_service.get_job_by_id(db=db, job_id=job_id, owner_id=current_user.id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    org = (
+        db.query(LinkedOrganization)
+        .filter(LinkedOrganization.id == job.target_org_id)
+        .first()
+    )
+
+    if not org:
+        raise HTTPException(status_code=404, detail="Organization not found")
+
+    # Test connection
+    erp_client = ERPNextClient(
+        base_url=org.erpnext_url, api_key=org.api_key, api_secret=org.api_secret
+    )
+
+    result = await erp_client.check_connection()
+
+    return {
+        "erpnext_url": org.erpnext_url,
+        "api_key_preview": org.api_key[:10] + "...",
+        "connection_test": result,
+    }
