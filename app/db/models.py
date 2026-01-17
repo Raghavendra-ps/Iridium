@@ -45,14 +45,9 @@ class ConversionJob(Base):
         Integer, ForeignKey("linked_organizations.id"), nullable=True
     )
     mapping_profile_id = Column(
-        Integer, ForeignKey("mapping_profiles.id"), nullable=True
+        Integer, ForeignKey("mapping_profiles.id", ondelete="SET NULL"), nullable=True
     )
-
-    # --- START OF CHANGE ---
-    # The import_template_id is removed.
-    # The parsing configuration is now stored directly with the job.
     parsing_config = Column(JSON, nullable=True)
-    # --- END OF CHANGE ---
 
     attendance_year = Column(Integer, nullable=True)
     attendance_month = Column(Integer, nullable=True)

@@ -1,5 +1,5 @@
-{% extends "dashboard_base.html" %} {% block title %}Settings{% endblock %} {%
-block content %}
+{% extends "dashboard_base.html" %} {% block title %}Settings - Gretis
+DataPort{% endblock %} {% block content %}
 
 <!-- Card for Linking Organizations -->
 <div class="card">
@@ -132,8 +132,8 @@ block content %}
 <div class="card">
     <h1 class="card-title">Attendance Code Mappings</h1>
     <p style="color: var(--color-text-muted); margin-bottom: 1.5rem">
-        Create reusable profiles to map codes from `MATRIX` (Daily Grid) source
-        files to standard ERPNext statuses (e.g., 'P' ➜ Present).
+        Create or edit reusable profiles to map codes from `MATRIX` source files
+        to standard ERPNext statuses.
     </p>
     <form id="newMappingProfileForm">
         <div
@@ -148,7 +148,7 @@ block content %}
                 <label
                     for="profile_name"
                     style="display: block; margin-bottom: 8px; font-weight: 500"
-                    >New Profile Name</label
+                    >Profile Name</label
                 >
                 <input
                     type="text"
@@ -193,7 +193,7 @@ block content %}
                 class="btn"
                 style="background-color: var(--color-accent); color: white"
             >
-                Save New Profile
+                Save as New Profile
             </button>
         </div>
     </form>
@@ -235,7 +235,6 @@ block content %}
         document.head.appendChild(style);
     }
 
-    // --- LOGIC FOR ORGANIZATIONS SECTION ---
     function initOrganizations(apiCall) {
         const orgsList = document.getElementById("orgs-list");
         const newLinkForm = document.getElementById("newLinkForm");
@@ -318,7 +317,6 @@ block content %}
         fetchAndRenderOrgs();
     }
 
-    // --- LOGIC FOR MAPPING PROFILES SECTION ---
     function initMappingProfiles(apiCall) {
         const newProfileForm = document.getElementById("newMappingProfileForm");
         const profileNameInput = document.getElementById("profile_name");
@@ -326,6 +324,7 @@ block content %}
         const addRowBtn = document.getElementById("add-mapping-row-btn");
         const formStatus = document.getElementById("mapping-form-status");
         const profilesList = document.getElementById("profiles-list");
+        let allProfiles = []; // Cache for editing
 
         const createMappingRow = (source = "", target = "") => {
             const row = document.createElement("div");
@@ -379,7 +378,7 @@ block content %}
                     "Error: Please add at least one mapping rule.";
                 formStatus.style.color = "red";
                 submitButton.disabled = false;
-                submitButton.textContent = "Save New Profile";
+                submitButton.textContent = "Save as New Profile";
                 return;
             }
             const payload = {
@@ -399,7 +398,7 @@ block content %}
                 formStatus.style.color = "green";
                 newProfileForm.reset();
                 rowsContainer.innerHTML = "";
-                createMappingRow();
+                createMappingRow(); // Add one empty row back
                 fetchAndRenderProfiles();
                 setTimeout(() => (formStatus.textContent = ""), 4000);
             } catch (error) {
@@ -407,7 +406,7 @@ block content %}
                 formStatus.style.color = "red";
             } finally {
                 submitButton.disabled = false;
-                submitButton.textContent = "Save New Profile";
+                submitButton.textContent = "Save as New Profile";
             }
         });
 
@@ -426,7 +425,7 @@ block content %}
                             ${p.mappings.map((m) => `<span>'${m.source_code}' ➜ ${m.target_status}</span>`).join("")}
                         </div>
                     </div>
-                    <div>
+                    <div style="display: flex; gap: 0.5rem;">
                         <button class="btn" onclick="editProfile(${p.id})">Edit</button>
                         <button class="btn btn-danger" onclick="deleteProfile(${p.id})">Delete</button>
                     </div>
@@ -440,43 +439,53 @@ block content %}
             try {
                 const response = await apiCall("/api/v1/mapping-profiles/");
                 if (!response.ok) throw new Error("Failed to fetch profiles.");
-                const profiles = await response.json();
-                window.allProfiles = profiles; // Store for editing
-                renderProfiles(profiles);
+                allProfiles = await response.json(); // Cache the profiles
+                renderProfiles(allProfiles);
             } catch (error) {
                 profilesList.innerHTML = `<p style="color: red;">${error.message}</p>`;
             }
         };
 
+        // --- START OF FIX: Implemented Edit/Clone functionality ---
         window.editProfile = (profileId) => {
-            const profile = window.allProfiles.find((p) => p.id === profileId);
-            if (!profile) return;
+            const profile = allProfiles.find((p) => p.id === profileId);
+            if (!profile) {
+                alert("Could not find profile to edit. Please refresh.");
+                return;
+            }
 
-            profileNameInput.value = profile.name;
-            rowsContainer.innerHTML = ""; // Clear current rows
+            // Populate the form with the selected profile's data
+            profileNameInput.value = profile.name + " (Copy)"; // Suggest a new name
+            rowsContainer.innerHTML = ""; // Clear existing rows in the form
             profile.mappings.forEach((m) =>
                 createMappingRow(m.source_code, m.target_status),
             );
 
-            // We can't truly edit yet without a PUT endpoint, but we can load the data.
-            // For now, the user can modify and save as a new profile.
-            alert(
-                "Editing is not fully implemented. You can modify the loaded data and save it as a new profile.",
-            );
+            // Scroll to the top so the user can see the populated form
+            window.scrollTo({ top: 0, behavior: "smooth" });
+            profileNameInput.focus();
         };
+        // --- END OF FIX ---
 
         window.deleteProfile = async (profileId) => {
-            if (!confirm("Are you sure you want to delete this profile?"))
+            if (
+                !confirm(
+                    "Are you sure you want to delete this profile? This cannot be undone.",
+                )
+            )
                 return;
             try {
                 const response = await apiCall(
                     `/api/v1/mapping-profiles/${profileId}`,
                     { method: "DELETE" },
                 );
-                if (!response.ok) throw new Error("Failed to delete.");
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || "Failed to delete.");
+                }
                 fetchAndRenderProfiles();
             } catch (e) {
-                alert("Error deleting profile.");
+                alert("Error deleting profile: " + e.message);
             }
         };
 
