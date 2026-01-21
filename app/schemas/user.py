@@ -1,11 +1,13 @@
+# app/schemas/user.py
 from pydantic import BaseModel, EmailStr
 from typing import Literal, Optional
 from datetime import datetime
 
 # --- User Roles and Statuses ---
-UserRole = Literal['admin', 'employee', 'client']
+# We include 'admin' and 'client' for legacy/compatibility, 
+# but 'superadmin', 'manager', 'employee' are your new enterprise roles.
+UserRole = Literal['superadmin', 'manager', 'employee', 'admin', 'client']
 UserStatus = Literal['pending', 'active']
-
 
 # --- Token Schemas ---
 class Token(BaseModel):
@@ -15,7 +17,6 @@ class Token(BaseModel):
 class TokenPayload(BaseModel):
     sub: Optional[str] = None
 
-
 # --- Base User Schemas ---
 class UserBase(BaseModel):
     email: EmailStr
@@ -23,8 +24,7 @@ class UserBase(BaseModel):
 class UserCreate(UserBase):
     password: str
 
-
-# --- Schemas for API Responses ---
+# --- Schema for API Responses (The one that was failing) ---
 class User(UserBase):
     id: int
     is_active: bool
@@ -32,7 +32,6 @@ class User(UserBase):
 
     class Config:
         orm_mode = True
-
 
 # --- Schemas for Admin Management ---
 class UserUpdate(BaseModel):

@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 app = FastAPI(
     title="Gretis DataPort",
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
+    redirect_slashes=False # Add this
 )
 
 

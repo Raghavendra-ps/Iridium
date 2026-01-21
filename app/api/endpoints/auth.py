@@ -2,7 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
-from app.schemas import user as user_schemas
+# Correct: Import schemas from the dedicated schemas folder
+from app.schemas import user as user_schemas 
 from app.core.services import user_service
 from app.core import security
 from app.db.session import get_db
