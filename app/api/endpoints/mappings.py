@@ -1,8 +1,6 @@
-# Iridium-main/app/api/endpoints/mappings.py
-
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
 from app.api import dependencies
@@ -21,7 +19,9 @@ router = APIRouter()
 def create_mapping_profile(
     *,
     db: Session = Depends(get_db),
-    current_user: User = Depends(dependencies.get_current_user),
+    # --- START OF FIX: Use the correct dependency name ---
+    current_user: User = Depends(dependencies.get_current_internal_user),
+    # --- END OF FIX ---
     profile_in: mapping_schemas.MappingProfileCreate,
 ):
     """Create a new attendance code mapping profile."""
@@ -34,7 +34,9 @@ def create_mapping_profile(
 def list_user_mapping_profiles(
     *,
     db: Session = Depends(get_db),
-    current_user: User = Depends(dependencies.get_current_user),
+    # --- START OF FIX: Use the correct dependency name ---
+    current_user: User = Depends(dependencies.get_current_internal_user),
+    # --- END OF FIX ---
 ):
     """List all mapping profiles for the current user."""
     return mapping_service.get_mapping_profiles_by_owner(
@@ -46,11 +48,12 @@ def list_user_mapping_profiles(
 def delete_mapping_profile(
     *,
     db: Session = Depends(get_db),
-    current_user: User = Depends(dependencies.get_current_user),
+    # --- START OF FIX: Use the correct dependency name ---
+    current_user: User = Depends(dependencies.get_current_internal_user),
+    # --- END OF FIX ---
     profile_id: int,
 ):
     """Delete a mapping profile."""
     return mapping_service.delete_mapping_profile(
         db=db, owner_id=current_user.id, profile_id=profile_id
     )
-    return mapping_service.delete_mapping_profile(db=db, owner_id=current_user.id, profile_id=profile_id)

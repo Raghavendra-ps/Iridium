@@ -1,892 +1,424 @@
-{% extends "dashboard_base.html" %} {% block title %}Validate Job #{{ job_id
-}}{% endblock %} {% block content %}
-<div
-    id="job-detail-container"
-    data-job-id="{{ job_id }}"
-    style="
-        height: calc(100vh - 60px);
-        display: flex;
-        flex-direction: column;
-        overflow: hidden;
-    "
->
-    <!-- Header Card -->
-    <div class="card" style="margin-bottom: 12px; flex-shrink: 0">
-        <div
-            style="
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-            "
-        >
+{% extends "dashboard_base.html" %}
+
+{% block title %}Validate Job #{{ job_id }} - Gretis DataPort{% endblock %}
+
+{% block content %}
+<div id="job-detail-container">
+    <!-- Header -->
+    <div class="card" style="margin-bottom: 20px;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
             <div>
-                <h1
-                    id="job-title"
-                    class="card-title"
-                    style="margin-bottom: 4px"
-                >
-                    Step 2: Validate Data for Job #{{ job_id }}
-                </h1>
-                <p
-                    id="job-subtitle"
-                    style="color: var(--color-text-muted); margin: 0"
-                >
-                    Fetching details...
-                </p>
+                <h1 id="job-title" class="card-title">Step 2: Validate Data for Job #{{ job_id }}</h1>
+                <p id="job-subtitle" style="color: var(--color-text-muted)">Fetching details...</p>
             </div>
-            <div id="job-status-badge" class="status-badge">LOADING</div>
+            <div style="display: flex; align-items: center; gap: 1rem;">
+                <span id="save-status" style="color: var(--color-text-muted); font-size: 0.8rem; transition: opacity 0.5s;"></span>
+                <div id="job-status-badge" class="status-badge">LOADING</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Unsaved Changes Prompt (initially hidden) -->
+    <div id="restore-prompt" class="card" style="display: none; background-color: #fef9c3; border-color: #fde68a;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <p style="color: #92400e; font-weight: 500;">You have unsaved changes from a previous session for this job.</p>
+            <div>
+                <button id="discard-btn" class="btn" style="background: #fee2e2; color: #991b1b;">Discard</button>
+                <button id="restore-btn" class="btn" style="background: #dcfce7; color: #166534; margin-left: 0.5rem;">Restore Changes</button>
+            </div>
         </div>
     </div>
 
     <!-- Submission Error Panel -->
-    <div
-        id="submission-error-panel"
-        class="card"
-        style="
-            display: none;
-            border-color: #fca5a5;
-            background-color: #fff1f2;
-            margin-bottom: 12px;
-            flex-shrink: 0;
-        "
-    >
-        <h2
-            class="card-title"
-            style="color: #b91c1c; margin-bottom: 8px; font-size: 1rem"
-        >
-            Previous Submission Failed
-        </h2>
-        <p
-            id="submission-error-summary"
-            style="margin-bottom: 8px; color: #b91c1c; font-size: 0.875rem"
-        ></p>
-        <div
-            id="submission-error-details"
-            style="
-                max-height: 150px;
-                overflow-y: auto;
-                background: white;
-                padding: 8px;
-                border-radius: 6px;
-                font-size: 0.875rem;
-            "
-        ></div>
+    <div id="submission-error-panel" class="card" style="display: none; border-color: #fca5a5; background-color: #fff1f2; margin-bottom: 20px;">
+        <h2 class="card-title" style="color: #b91c1c;">Previous Submission Failed</h2>
+        <p id="submission-error-summary" style="margin-bottom: 1rem; color: #b91c1c;"></p>
+        <div id="submission-error-details" style="max-height: 200px; overflow-y: auto; background: white; padding: 1rem; border-radius: 8px;"></div>
     </div>
-
+    
     <!-- Quick Stats Dashboard -->
-    <div
-        id="stats-dashboard"
-        class="card"
-        style="display: none; margin-bottom: 12px; flex-shrink: 0"
-    >
-        <div
-            style="
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-                gap: 1rem;
-            "
-        >
-            <div class="stat-card">
-                <div id="stat-total-records" class="stat-value">-</div>
-                <div class="stat-label">Total Records</div>
-            </div>
-            <div class="stat-card">
-                <div id="stat-employee-count" class="stat-value">-</div>
-                <div class="stat-label">Employees</div>
-            </div>
-            <div class="stat-card">
-                <div
-                    id="stat-present-count"
-                    class="stat-value"
-                    style="color: #059669"
-                >
-                    -
-                </div>
-                <div class="stat-label">Present</div>
-            </div>
-            <div class="stat-card">
-                <div
-                    id="stat-absent-count"
-                    class="stat-value"
-                    style="color: #dc2626"
-                >
-                    -
-                </div>
-                <div class="stat-label">Absent</div>
-            </div>
-            <div class="stat-card">
-                <div
-                    id="stat-leave-count"
-                    class="stat-value"
-                    style="color: #2563eb"
-                >
-                    -
-                </div>
-                <div class="stat-label">On Leave</div>
-            </div>
-            <div class="stat-card">
-                <div
-                    id="stat-halfday-count"
-                    class="stat-value"
-                    style="color: #f59e0b"
-                >
-                    -
-                </div>
-                <div class="stat-label">Half Day</div>
-            </div>
+    <div id="stats-dashboard" class="card" style="margin-bottom: 20px; display: none;">
+         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1.5rem;">
+            <div class="stat-card"><div id="stat-total-records" class="stat-value">-</div><div class="stat-label">Total Records</div></div>
+            <div class="stat-card"><div id="stat-employee-count" class="stat-value">-</div><div class="stat-label">Employees Affected</div></div>
+            <div class="stat-card"><div id="stat-present-count" class="stat-value" style="color: #059669;">-</div><div class="stat-label">Present</div></div>
+            <div class="stat-card"><div id="stat-absent-count" class="stat-value" style="color: #dc2626;">-</div><div class="stat-label">Absent</div></div>
+            <div class="stat-card"><div id="stat-leave-count" class="stat-value" style="color: #2563eb;">-</div><div class="stat-label">On Leave</div></div>
+            <div class="stat-card"><div id="stat-halfday-count" class="stat-value" style="color: #f59e0b;">-</div><div class="stat-label">Half Day</div></div>
         </div>
     </div>
 
     <!-- Data Validation Section -->
-    <div
-        class="card"
-        style="
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-            min-height: 0;
-        "
-    >
+    <div class="card">
         <!-- Tabs -->
-        <div
-            style="
-                display: flex;
-                border-bottom: 1px solid var(--color-border);
-                margin-bottom: 1rem;
-                flex-shrink: 0;
-            "
-        >
-            <button id="tab-processed" class="tab-btn active">
-                Validation Grid (Editable)
-            </button>
-            <button id="tab-raw" class="tab-btn">
-                Raw Extracted Data (Read-only)
-            </button>
+        <div style="display: flex; border-bottom: 1px solid var(--color-border); margin-bottom: 1.5rem;">
+            <button id="tab-processed" class="tab-btn active">Validation Grid (Editable)</button>
+            <button id="tab-raw" class="tab-btn">Raw Extracted Data (Read-only)</button>
         </div>
 
-        <!-- Toolbar -->
-        <div class="grid-toolbar" style="flex-shrink: 0">
+        <!-- Toolbar for Grid Controls -->
+        <div class="grid-toolbar">
             <div class="toolbar-group">
-                <label
-                    for="search-field"
-                    style="font-size: 0.9rem; color: #666; margin-right: 8px"
-                    >Search:</label
-                >
-                <input
-                    type="search"
-                    id="search-field"
-                    placeholder="Search data..."
-                    class="toolbar-input"
-                />
+                <label for="search-field" style="font-size: 0.9rem; color: #666; margin-right: 8px;">Search:</label>
+                <input type="search" id="search-field" placeholder="Search data..." class="toolbar-input">
             </div>
-            <button
-                id="fullscreen-btn"
-                class="toolbar-btn"
-                title="Toggle Fullscreen"
-            >
-                ⛶
-            </button>
+            <div class="toolbar-group">
+                <button id="zoom-out-btn" class="toolbar-btn" title="Zoom Out">-</button>
+                <span id="zoom-level-text" style="width: 40px; text-align: center; font-size: 0.9rem;">100%</span>
+                <button id="zoom-in-btn" class="toolbar-btn" title="Zoom In">+</button>
+            </div>
+            <button id="fullscreen-btn" class="toolbar-btn" title="Toggle Fullscreen">⛶</button>
         </div>
 
-        <!-- Views -->
-        <div
-            id="view-processed"
-            style="
-                flex: 1;
-                display: flex;
-                flex-direction: column;
-                min-height: 0;
-            "
-        >
-            <div
-                id="processed-data-grid"
-                style="
-                    width: 100%;
-                    flex: 1;
-                    overflow: hidden;
-                    border: 1px solid #e2e8f0;
-                    font-size: 14px;
-                "
-            ></div>
-            <div
-                id="actions-bar"
-                style="
-                    margin-top: 1rem;
-                    display: none;
-                    justify-content: flex-end;
-                    gap: 1rem;
-                    flex-shrink: 0;
-                "
-            >
-                <button
-                    id="proceedBtn"
-                    class="btn"
-                    style="
-                        background-color: var(--color-accent);
-                        color: white;
-                        font-size: 1rem;
-                        padding: 12px 24px;
-                    "
-                >
-                    Proceed to Employee Mapping
-                </button>
+        <!-- Processed and Raw Data Views -->
+        <div id="view-processed">
+            <div id="processed-data-grid" style="width: 100%; height: 60vh; overflow: hidden; border: 1px solid #e2e8f0; font-size: 14px;"></div>
+            <div id="actions-bar" style="margin-top: 1.5rem; display: none; justify-content: flex-end; gap: 1rem;">
+                <button id="proceedBtn" class="btn" style="background-color: var(--color-accent); color: white; font-size: 1rem; padding: 12px 24px;">Proceed to Employee Mapping</button>
             </div>
         </div>
-        <div
-            id="view-raw"
-            style="
-                flex: 1;
-                display: none;
-                flex-direction: column;
-                min-height: 0;
-            "
-        >
-            <div
-                id="raw-data-grid"
-                style="
-                    width: 100%;
-                    flex: 1;
-                    overflow: hidden;
-                    border: 1px solid #e2e8f0;
-                    font-size: 14px;
-                "
-            ></div>
+        <div id="view-raw" style="display: none;">
+            <div id="raw-data-grid" style="width: 100%; height: 60vh; overflow: hidden; border: 1px solid #e2e8f0; font-size: 14px;"></div>
         </div>
     </div>
 </div>
 
 <style>
-    .status-badge {
-        background: #eee;
-        padding: 6px 12px;
-        border-radius: 99px;
-        font-size: 0.9rem;
-        font-weight: 500;
-    }
-    .stat-card {
-        border: 1px solid var(--color-border);
-        padding: 1rem;
-        border-radius: var(--radius-lg);
-        text-align: center;
-        background: #fff;
-    }
-    .stat-value {
-        font-size: 2rem;
-        font-weight: 700;
-        color: var(--color-primary);
-        line-height: 1;
-    }
-    .stat-label {
-        color: var(--color-text-muted);
-        margin-top: 0.5rem;
-        font-size: 0.875rem;
-    }
-    .tab-btn {
-        padding: 10px 20px;
-        border: none;
-        background: none;
-        cursor: pointer;
-        font-size: 1rem;
-        font-weight: 500;
-        color: var(--color-text-muted);
-        border-bottom: 3px solid transparent;
-        margin-bottom: -2px;
-        transition:
-            color 0.2s,
-            border-color 0.2s;
-    }
-    .tab-btn:hover {
-        color: var(--color-accent);
-    }
-    .tab-btn.active {
-        color: var(--color-accent);
-        border-bottom-color: var(--color-accent);
-    }
-    .grid-toolbar {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 0.5rem 0;
-        margin-bottom: 1rem;
-    }
-    .toolbar-group {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-    }
-    .toolbar-input {
-        padding: 6px 10px;
-        border: 1px solid var(--color-border);
-        border-radius: 6px;
-        font-size: 0.9rem;
-        min-width: 200px;
-    }
-    .toolbar-input:focus {
-        outline: 2px solid var(--color-accent);
-        outline-offset: -1px;
-    }
-    .toolbar-btn {
-        font-size: 1.2rem;
-        font-weight: bold;
-        width: 32px;
-        height: 32px;
-        border: 1px solid var(--color-border);
-        border-radius: 6px;
-        background-color: #fff;
-        cursor: pointer;
-        transition: background-color 0.2s;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-    .toolbar-btn:hover {
-        background-color: #f1f5f9;
-    }
-
-    /* Color coding for attendance statuses */
-    .htCore td.status-present {
-        background-color: #d1fae5 !important;
-        color: #065f46 !important;
-    }
-    .htCore td.status-absent {
-        background-color: #fee2e2 !important;
-        color: #991b1b !important;
-    }
-    .htCore td.status-leave {
-        background-color: #dbeafe !important;
-        color: #1e40af !important;
-    }
-    .htCore td.status-halfday {
-        background-color: #fef3c7 !important;
-        color: #92400e !important;
-    }
+    .dashboard-layout { gap: 0; }
+    .sidebar { display: none; }
+    .main-content { width: 100%; max-width: 100%; }
+    .status-badge { background: #eee; padding: 6px 12px; border-radius: 99px; font-size: 0.9rem; font-weight: 500; }
+    .stat-card { border: 1px solid var(--color-border); padding: 1.5rem; border-radius: var(--radius-lg); text-align: center; background: #fff; }
+    .stat-value { font-size: 2.5rem; font-weight: 700; color: var(--color-primary); line-height: 1; }
+    .stat-label { color: var(--color-text-muted); margin-top: 0.5rem; font-size: 0.875rem; }
+    .tab-btn { padding: 10px 20px; border: none; background: none; cursor: pointer; font-size: 1rem; font-weight: 500; color: var(--color-text-muted); border-bottom: 3px solid transparent; margin-bottom: -2px; transition: color 0.2s, border-color 0.2s; }
+    .tab-btn:hover { color: var(--color-accent); }
+    .tab-btn.active { color: var(--color-accent); border-bottom-color: var(--color-accent); }
+    .grid-toolbar { display: flex; align-items: center; justify-content: space-between; padding: 0.5rem 0; margin-bottom: 1rem; }
+    .toolbar-group { display: flex; align-items: center; gap: 4px; }
+    .toolbar-input { padding: 6px 10px; border: 1px solid var(--color-border); border-radius: 6px; font-size: 0.9rem; min-width: 200px; }
+    .toolbar-input:focus { outline: 2px solid var(--color-accent); outline-offset: -1px; }
+    .toolbar-btn { font-size: 1.2rem; font-weight: bold; width: 32px; height: 32px; border: 1px solid var(--color-border); border-radius: 6px; background-color: #fff; cursor: pointer; transition: background-color 0.2s; display: flex; align-items: center; justify-content: center; }
+    .toolbar-btn:hover { background-color: #f1f5f9; }
+    .ht_clone_left { z-index: 101 !important; }
+    .ht_clone_top { z-index: 102 !important; }
+    .ht_clone_top_left_corner { z-index: 103 !important; }
+    .htDropdownMenu { z-index: 200 !important; }
 </style>
-{% endblock %} {% block scripts %}
+{% endblock %}
+
+{% block scripts %}
 <script>
-    document.addEventListener("DOMContentLoaded", async function () {
-        const getToken = () => localStorage.getItem("access_token");
+document.addEventListener("DOMContentLoaded", async function () {
+    const token = localStorage.getItem("access_token");
+    if (!token) { window.location.href = "/login"; return; }
 
-        if (!getToken()) {
-            window.location.href = "/login";
-            return;
+    const jobId = document.getElementById("job-detail-container").dataset.jobId;
+
+    const elTitle = document.getElementById("job-title");
+    const elSubtitle = document.getElementById("job-subtitle");
+    const elBadge = document.getElementById("job-status-badge");
+    const elActions = document.getElementById("actions-bar");
+    const btnProceed = document.getElementById("proceedBtn");
+    const tabProcessed = document.getElementById("tab-processed");
+    const tabRaw = document.getElementById("tab-raw");
+    const viewProcessed = document.getElementById("view-processed");
+    const viewRaw = document.getElementById("view-raw");
+    const gridProcessedContainer = document.getElementById("processed-data-grid");
+    const gridRawContainer = document.getElementById("raw-data-grid");
+    const searchField = document.getElementById('search-field');
+    const zoomInBtn = document.getElementById('zoom-in-btn');
+    const zoomOutBtn = document.getElementById('zoom-out-btn');
+    const zoomLevelText = document.getElementById('zoom-level-text');
+    const fullscreenBtn = document.getElementById('fullscreen-btn');
+    const errorPanel = document.getElementById('submission-error-panel');
+    const errorSummary = document.getElementById('submission-error-summary');
+    const errorDetails = document.getElementById('submission-error-details');
+    const statsDashboard = document.getElementById('stats-dashboard');
+    const statTotalRecords = document.getElementById('stat-total-records');
+    const statEmployeeCount = document.getElementById('stat-employee-count');
+    const statPresentCount = document.getElementById('stat-present-count');
+    const statAbsentCount = document.getElementById('stat-absent-count');
+    const statLeaveCount = document.getElementById('stat-leave-count');
+    const statHalfDayCount = document.getElementById('stat-halfday-count');
+    const saveStatusEl = document.getElementById('save-status');
+    const restorePromptEl = document.getElementById('restore-prompt');
+    const restoreBtn = document.getElementById('restore-btn');
+    const discardBtn = document.getElementById('discard-btn');
+    
+    let hotProcessed, hotRaw;
+    let zoomLevel = 100;
+    let currentJobData = null;
+    let autoSaveTimer;
+
+    const apiCall = (url, options = {}) => {
+        const defaultOptions = { headers: { 'Authorization': `Bearer ${token}` } };
+        const mergedOptions = { ...defaultOptions, ...options, headers: { ...defaultOptions.headers, ...options.headers } };
+        return fetch(url, mergedOptions);
+    };
+
+    const sidebar = document.querySelector('.sidebar');
+    const mainContent = document.querySelector('.main-content');
+    if (sidebar && mainContent) {
+        sidebar.style.display = 'none';
+        mainContent.style.width = '100%';
+        mainContent.style.maxWidth = '100%';
+        mainContent.parentElement.style.gap = '0';
+    }
+
+    const applyZoom = () => {
+        const fontSize = 14 * (zoomLevel / 100);
+        gridProcessedContainer.style.fontSize = `${fontSize}px`;
+        gridRawContainer.style.fontSize = `${fontSize}px`;
+        zoomLevelText.textContent = `${zoomLevel}%`;
+        if (hotProcessed) hotProcessed.render();
+        if (hotRaw) hotRaw.render();
+    };
+    zoomInBtn.addEventListener('click', () => { zoomLevel = Math.min(200, zoomLevel + 10); applyZoom(); });
+    zoomOutBtn.addEventListener('click', () => { zoomLevel = Math.max(50, zoomLevel - 10); applyZoom(); });
+    searchField.addEventListener('keyup', (event) => {
+        const currentGrid = (viewProcessed.style.display !== 'none') ? hotProcessed : hotRaw;
+        if (currentGrid) {
+            const search = currentGrid.getPlugin('search');
+            if (search) { search.query(event.target.value); currentGrid.render(); }
         }
-
-        const jobId = document.getElementById("job-detail-container").dataset
-            .jobId;
-        if (!jobId) {
-            alert("Error: Job ID not found in page");
-            return;
-        }
-
-        const elTitle = document.getElementById("job-title");
-        const elSubtitle = document.getElementById("job-subtitle");
-        const elBadge = document.getElementById("job-status-badge");
-        const elActions = document.getElementById("actions-bar");
-        const btnProceed = document.getElementById("proceedBtn");
-        const tabProcessed = document.getElementById("tab-processed");
-        const tabRaw = document.getElementById("tab-raw");
-        const viewProcessed = document.getElementById("view-processed");
-        const viewRaw = document.getElementById("view-raw");
-        const gridProcessedContainer = document.getElementById(
-            "processed-data-grid",
-        );
-        const gridRawContainer = document.getElementById("raw-data-grid");
-        const searchField = document.getElementById("search-field");
-        const fullscreenBtn = document.getElementById("fullscreen-btn");
-        const errorPanel = document.getElementById("submission-error-panel");
-        const errorSummary = document.getElementById(
-            "submission-error-summary",
-        );
-        const errorDetails = document.getElementById(
-            "submission-error-details",
-        );
-        const statsDashboard = document.getElementById("stats-dashboard");
-
-        let hotProcessed, hotRaw;
-        let currentJobData = null;
-
-        const apiCall = async (url, options = {}) => {
-            const token = getToken();
-            if (!token) {
-                alert("Session expired. Please login again.");
-                window.location.href = "/login";
-                throw new Error("No token");
-            }
-
-            const response = await fetch(url, {
-                ...options,
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                    ...options.headers,
-                },
-            });
-
-            if (response.status === 401) {
-                localStorage.removeItem("access_token");
-                alert("Session expired. Please login again.");
-                window.location.href = "/login";
-                throw new Error("Session expired");
-            }
-
-            return response;
-        };
-
-        // Hide sidebar for full-width view
-        const sidebar = document.querySelector(".sidebar");
-        const mainContent = document.querySelector(".main-content");
-        if (sidebar && mainContent) {
-            sidebar.style.display = "none";
-            mainContent.style.width = "100%";
-            mainContent.style.maxWidth = "100%";
-            mainContent.parentElement.style.gap = "0";
-        }
-
-        // Search functionality
-        searchField.addEventListener("keyup", (event) => {
-            const currentGrid =
-                viewProcessed.style.display !== "none" ? hotProcessed : hotRaw;
-            if (currentGrid) {
-                const search = currentGrid.getPlugin("search");
-                if (search) {
-                    search.query(event.target.value);
-                    currentGrid.render();
-                }
-            }
-        });
-
-        // Fullscreen toggle
-        fullscreenBtn.addEventListener("click", () => {
-            const container = document.querySelector(
-                "#job-detail-container .card:last-of-type",
-            );
-            if (!document.fullscreenElement) {
-                container
-                    .requestFullscreen()
-                    .catch((err) => console.error("Fullscreen error:", err));
-            } else {
-                document.exitFullscreen();
-            }
-        });
-
-        // Tab switching
-        tabProcessed.addEventListener("click", () => {
-            tabProcessed.classList.add("active");
-            tabRaw.classList.remove("active");
-            viewProcessed.style.display = "flex";
-            viewRaw.style.display = "none";
-            if (hotProcessed) hotProcessed.render();
-        });
-
-        tabRaw.addEventListener("click", () => {
-            tabRaw.classList.add("active");
-            tabProcessed.classList.remove("active");
-            viewRaw.style.display = "flex";
-            viewProcessed.style.display = "none";
-            if (!hotRaw) {
-                loadRawGrid();
-            } else {
-                hotRaw.render();
-            }
-        });
-
-        function updateStatsDashboard(records) {
-            if (!records || records.length === 0) {
-                statsDashboard.style.display = "none";
-                return;
-            }
-            document.getElementById("stat-total-records").textContent =
-                records.length;
-            const uniqueEmployees = new Set(
-                records.map((r) => r.employee).filter((e) => e),
-            );
-            document.getElementById("stat-employee-count").textContent =
-                uniqueEmployees.size;
-
-            const statusCounts = records.reduce((acc, record) => {
-                if (record.status)
-                    acc[record.status] = (acc[record.status] || 0) + 1;
-                return acc;
-            }, {});
-
-            document.getElementById("stat-present-count").textContent =
-                statusCounts["Present"] || 0;
-            document.getElementById("stat-absent-count").textContent =
-                statusCounts["Absent"] || 0;
-            document.getElementById("stat-leave-count").textContent =
-                statusCounts["On Leave"] || 0;
-            document.getElementById("stat-halfday-count").textContent =
-                statusCounts["Half Day"] || 0;
-            statsDashboard.style.display = "block";
-        }
-
-        function pivotDataToGridFormat(records) {
-            const employeeData = {};
-            records.forEach((record) => {
-                if (!record.employee || !record.attendance_date) return;
-                const day = new Date(record.attendance_date).getUTCDate();
-                if (!employeeData[record.employee]) {
-                    employeeData[record.employee] = {
-                        "Employee Code": record.employee,
-                        "Employee Name":
-                            record.employee_name || record.employee,
-                    };
-                }
-                employeeData[record.employee][day] = record.status;
-            });
-            return { gridData: Object.values(employeeData) };
-        }
-
-        function unpivotGridToRecords(gridData, year, month) {
-            const records = [];
-            gridData.forEach((employeeRow) => {
-                const empCode = employeeRow["Employee Code"];
-                if (!empCode) return;
-                for (const [key, value] of Object.entries(employeeRow)) {
-                    if (!isNaN(key) && value) {
-                        const day = parseInt(key, 10);
-                        const date = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-                        records.push({
-                            employee: empCode,
-                            employee_name: employeeRow["Employee Name"],
-                            attendance_date: date,
-                            status: value,
-                        });
-                    }
-                }
-            });
-            return records;
-        }
-
-        function statusRenderer(
-            instance,
-            td,
-            row,
-            col,
-            prop,
-            value,
-            cellProperties,
-        ) {
-            Handsontable.renderers.TextRenderer.apply(this, arguments);
-            td.style.fontWeight = "500";
-            td.classList.remove(
-                "status-present",
-                "status-absent",
-                "status-leave",
-                "status-halfday",
-            );
-
-            if (value) {
-                const valueLower = String(value).toLowerCase();
-                if (valueLower === "present" || valueLower === "p") {
-                    td.classList.add("status-present");
-                } else if (valueLower === "absent" || valueLower === "a") {
-                    td.classList.add("status-absent");
-                } else if (valueLower.includes("leave") || valueLower === "l") {
-                    td.classList.add("status-leave");
-                } else if (valueLower.includes("half")) {
-                    td.classList.add("status-halfday");
-                }
-            }
-        }
-
-        async function checkStatusAndLoad() {
-            try {
-                const res = await apiCall(
-                    `/api/v1/conversions/${jobId}/status`,
-                );
-                if (!res.ok) {
-                    const errorText = await res.text();
-                    throw new Error(
-                        `Failed to load job: ${res.status} ${errorText}`,
-                    );
-                }
-
-                const job = await res.json();
-                currentJobData = job;
-
-                elTitle.textContent = `Step 2: Validate Data for Job #${job.id}`;
-                elSubtitle.textContent = `${job.original_filename} | Created: ${new Date(job.created_at).toLocaleString()}`;
-                elBadge.textContent = job.status;
-
-                if (
-                    job.status === "SUBMISSION_FAILED" &&
-                    job.error_log &&
-                    job.error_log.details
-                ) {
-                    errorPanel.style.display = "block";
-                    errorSummary.textContent =
-                        job.error_log.summary ||
-                        "Some records failed to submit.";
-                    errorDetails.innerHTML = job.error_log.details
-                        .map(
-                            (err) => `
-                    <div style="border-bottom: 1px solid #fee2e2; padding-bottom: 0.5rem; margin-bottom: 0.5rem;">
-                        <strong>Record #${err.record_index + 1} (Emp: ${err.record_data.employee}):</strong>
-                        <p style="color: #991b1b; margin-left: 1rem;">${err.error}</p>
-                    </div>
-                `,
-                        )
-                        .join("");
-                }
-
-                if (
-                    job.status === "AWAITING_VALIDATION" ||
-                    job.status === "SUBMISSION_FAILED"
-                ) {
-                    if (
-                        job.target_doctype.toLowerCase() === "attendance" &&
-                        job.attendance_year &&
-                        job.attendance_month
-                    ) {
-                        await loadProcessedGridAsMatrix(
-                            job.attendance_year,
-                            job.attendance_month,
-                        );
-                    } else {
-                        await loadProcessedGridAsList();
-                    }
-                    elActions.style.display = "flex";
-                } else if (
-                    ["PROCESSING", "PENDING", "UPLOADED", "ANALYZING"].includes(
-                        job.status,
-                    )
-                ) {
-                    gridProcessedContainer.innerHTML = `<div style="padding:40px; text-align:center;">Processing... Page will refresh in 5s</div>`;
-                    setTimeout(() => window.location.reload(), 5000);
-                } else {
-                    gridProcessedContainer.innerHTML = `<div style="padding:40px; text-align:center;">Job is ${job.status}. No data to display or edit.</div>`;
-                }
-            } catch (e) {
-                console.error("Load error:", e);
-                gridProcessedContainer.innerHTML = `<div style="padding:40px; text-align:center; color:red;">Error: ${e.message}</div>`;
-            }
-        }
-
-        async function loadProcessedGridAsMatrix(year, month) {
-            try {
-                const res = await apiCall(
-                    `/api/v1/conversions/${jobId}/data/processed`,
-                );
-                if (!res.ok) throw new Error("Processed data file not found.");
-
-                const records = await res.json();
-                updateStatsDashboard(records);
-
-                if (records.length === 0) {
-                    gridProcessedContainer.innerHTML =
-                        '<div style="padding:40px; text-align:center; color:#666;">0 Records Processed.</div>';
-                    return;
-                }
-
-                const { gridData } = pivotDataToGridFormat(records);
-                const daysInMonth = new Date(year, month, 0).getDate();
-                const dayColumns = Array.from(
-                    { length: daysInMonth },
-                    (_, i) => ({
-                        data: `${i + 1}`,
-                        title: `${i + 1}`,
-                        type: "dropdown",
-                        width: 60,
-                        source: [
-                            "",
-                            "Present",
-                            "Absent",
-                            "On Leave",
-                            "Half Day",
-                        ],
-                        renderer: statusRenderer,
-                    }),
-                );
-
-                const columns = [
-                    {
-                        data: "Employee Code",
-                        title: "Employee Code",
-                        readOnly: true,
-                        width: 120,
-                    },
-                    {
-                        data: "Employee Name",
-                        title: "Employee Name",
-                        readOnly: true,
-                        width: 200,
-                    },
-                    ...dayColumns,
-                ];
-
-                gridProcessedContainer.innerHTML = "";
-                hotProcessed = new Handsontable(gridProcessedContainer, {
-                    data: gridData,
-                    columns,
-                    rowHeaders: true,
-                    colHeaders: true,
-                    licenseKey: "non-commercial-and-evaluation",
-                    height: "100%",
-                    width: "100%",
-                    fixedColumnsLeft: 2,
-                    manualColumnResize: true,
-                    dropdownMenu: true,
-                    filters: true,
-                    columnSorting: true,
-                    search: true,
-                    contextMenu: true,
-                });
-            } catch (e) {
-                gridProcessedContainer.innerHTML = `<div style="padding:20px; color:red;">Load Error: ${e.message}</div>`;
-            }
-        }
-
-        async function loadProcessedGridAsList() {
-            try {
-                const res = await apiCall(
-                    `/api/v1/conversions/${jobId}/data/processed`,
-                );
-                if (!res.ok) throw new Error("Processed data file not found.");
-
-                const data = await res.json();
-                updateStatsDashboard(data);
-
-                if (data.length === 0) {
-                    gridProcessedContainer.innerHTML =
-                        '<div style="padding:40px; text-align:center; color:#666;">0 Records Processed.</div>';
-                    return;
-                }
-
-                gridProcessedContainer.innerHTML = "";
-                const columns = Object.keys(data[0]).map((key) => ({
-                    data: key,
-                    title: key,
-                    renderer: key === "status" ? statusRenderer : undefined,
-                }));
-
-                hotProcessed = new Handsontable(gridProcessedContainer, {
-                    data,
-                    columns,
-                    rowHeaders: true,
-                    colHeaders: true,
-                    licenseKey: "non-commercial-and-evaluation",
-                    height: "100%",
-                    width: "100%",
-                    stretchH: "all",
-                    minSpareRows: 1,
-                    dropdownMenu: true,
-                    filters: true,
-                    columnSorting: true,
-                    search: true,
-                    contextMenu: true,
-                });
-            } catch (e) {
-                gridProcessedContainer.innerHTML = `<div style="padding:20px; color:red;">Load Error: ${e.message}</div>`;
-            }
-        }
-
-        async function loadRawGrid() {
-            try {
-                const res = await apiCall(
-                    `/api/v1/conversions/${jobId}/data/raw`,
-                );
-                if (!res.ok) throw new Error("Raw data file not found.");
-
-                const data = await res.json();
-                if (data.length === 0) {
-                    gridRawContainer.innerHTML =
-                        '<div style="padding:40px; text-align:center; color:#666;">No raw data available.</div>';
-                    return;
-                }
-
-                gridRawContainer.innerHTML = "";
-                const columns = Object.keys(data[0]).map((key) => ({
-                    data: key,
-                    title: key,
-                }));
-
-                hotRaw = new Handsontable(gridRawContainer, {
-                    data,
-                    columns,
-                    rowHeaders: true,
-                    colHeaders: true,
-                    licenseKey: "non-commercial-and-evaluation",
-                    height: "100%",
-                    width: "100%",
-                    readOnly: true,
-                    stretchH: "all",
-                    dropdownMenu: true,
-                    filters: true,
-                    columnSorting: true,
-                    search: true,
-                });
-            } catch (e) {
-                gridRawContainer.innerHTML = `<div style="padding:20px; color:red;">Load Error: ${e.message}</div>`;
-            }
-        }
-
-        btnProceed.addEventListener("click", async () => {
-            if (!hotProcessed || !currentJobData) {
-                alert("Data not loaded. Please wait or refresh the page.");
-                return;
-            }
-
-            btnProceed.disabled = true;
-            btnProceed.textContent = "Saving Changes...";
-
-            try {
-                const editedData = hotProcessed
-                    .getSourceData()
-                    .filter((row) =>
-                        Object.values(row).some(
-                            (val) => val !== null && val !== "",
-                        ),
-                    );
-
-                let recordsToSave;
-                if (
-                    currentJobData.target_doctype.toLowerCase() === "attendance"
-                ) {
-                    recordsToSave = unpivotGridToRecords(
-                        editedData,
-                        currentJobData.attendance_year,
-                        currentJobData.attendance_month,
-                    );
-                } else {
-                    recordsToSave = editedData;
-                }
-
-                console.log(
-                    `Saving ${recordsToSave.length} records to processed file...`,
-                );
-
-                const saveRes = await apiCall(
-                    `/api/v1/conversions/${jobId}/data/processed`,
-                    {
-                        method: "PUT",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ data: recordsToSave }),
-                    },
-                );
-
-                if (!saveRes.ok) {
-                    const errorData = await saveRes
-                        .json()
-                        .catch(() => ({ detail: "Unknown error" }));
-                    throw new Error(
-                        errorData.detail || "Failed to save edited data",
-                    );
-                }
-
-                console.log(
-                    "Data saved successfully, navigating to mapping page...",
-                );
-                window.location.href = `/jobs/${jobId}/map-employees`;
-            } catch (e) {
-                console.error("Proceed error:", e);
-                alert(`Error: ${e.message}`);
-                btnProceed.disabled = false;
-                btnProceed.textContent = "Proceed to Employee Mapping";
-            }
-        });
-
-        checkStatusAndLoad();
     });
+    fullscreenBtn.addEventListener('click', () => {
+        const container = document.querySelector('#job-detail-container .card:last-of-type');
+        if (!document.fullscreenElement) {
+            container.requestFullscreen().catch(err => { console.error('Fullscreen error:', err); });
+        } else { document.exitFullscreen(); }
+    });
+    tabProcessed.addEventListener('click', () => {
+        tabProcessed.classList.add('active'); tabRaw.classList.remove('active');
+        viewProcessed.style.display = 'block'; viewRaw.style.display = 'none';
+        if (hotProcessed) hotProcessed.render();
+    });
+    tabRaw.addEventListener('click', () => {
+        tabRaw.classList.add('active'); tabProcessed.classList.remove('active');
+        viewRaw.style.display = 'block'; viewProcessed.style.display = 'none';
+        if (!hotRaw) { loadRawGrid(); } else { hotRaw.render(); }
+    });
+
+    const getDraftKey = () => `job-draft-${jobId}`;
+
+    function showSaveStatus(message, fadeOut = true) {
+        saveStatusEl.textContent = message;
+        saveStatusEl.style.opacity = '1';
+        if (fadeOut) {
+            setTimeout(() => { saveStatusEl.style.opacity = '0'; }, 3000);
+        }
+    }
+
+    function saveDraft() {
+        if (!hotProcessed) return;
+        const data = hotProcessed.getSourceData();
+        localStorage.setItem(getDraftKey(), JSON.stringify(data));
+        showSaveStatus(`Draft saved at ${new Date().toLocaleTimeString()}`);
+    }
+
+    function checkForDraft() {
+        const draftDataJSON = localStorage.getItem(getDraftKey());
+        if (draftDataJSON) {
+            try {
+                const draftData = JSON.parse(draftDataJSON);
+                restorePromptEl.style.display = 'block';
+                
+                restoreBtn.onclick = () => {
+                    hotProcessed.loadData(draftData);
+                    restorePromptEl.style.display = 'none';
+                    showSaveStatus('Restored unsaved changes.');
+                };
+                
+                discardBtn.onclick = () => {
+                    localStorage.removeItem(getDraftKey());
+                    restorePromptEl.style.display = 'none';
+                };
+            } catch (e) {
+                console.error("Could not parse draft data:", e);
+                localStorage.removeItem(getDraftKey());
+            }
+        }
+    }
+
+    function updateStatsDashboard(records) {
+        if (!records || records.length === 0) { statsDashboard.style.display = 'none'; return; }
+        statTotalRecords.textContent = records.length;
+        const uniqueEmployees = new Set(records.map(r => r.employee).filter(e => e));
+        statEmployeeCount.textContent = uniqueEmployees.size;
+        const statusCounts = records.reduce((acc, record) => {
+            if (record.status) { acc[record.status] = (acc[record.status] || 0) + 1; }
+            return acc;
+        }, {});
+        statPresentCount.textContent = statusCounts['Present'] || 0;
+        statAbsentCount.textContent = statusCounts['Absent'] || 0;
+        statLeaveCount.textContent = statusCounts['On Leave'] || 0;
+        statHalfDayCount.textContent = statusCounts['Half Day'] || 0;
+        statsDashboard.style.display = 'block';
+    }
+
+    function pivotDataToGridFormat(records) {
+        const employeeData = {};
+        records.forEach(record => {
+            if (!record.employee || !record.attendance_date) return;
+            const day = new Date(record.attendance_date).getUTCDate();
+            if (!employeeData[record.employee]) {
+                employeeData[record.employee] = { 'Employee Code': record.employee, 'Employee Name': record.employee_name || record.employee, };
+            }
+            employeeData[record.employee][day] = record.status;
+        });
+        return { gridData: Object.values(employeeData) };
+    }
+
+    function unpivotGridToRecords(gridData, year, month) {
+        const records = [];
+        gridData.forEach(employeeRow => {
+            const empCode = employeeRow['Employee Code'];
+            if (!empCode) return;
+            for (const [key, value] of Object.entries(employeeRow)) {
+                if (!isNaN(key) && value) {
+                    const day = parseInt(key, 10);
+                    const date = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                    records.push({ employee: empCode, employee_name: employeeRow['Employee Name'], attendance_date: date, status: value });
+                }
+            }
+        });
+        return records;
+    }
+
+    async function checkStatusPoller() {
+        try {
+            const res = await apiCall(`/api/v1/conversions/${jobId}/status`);
+            if (!res.ok) {
+                if (res.status === 401) { window.location.href = "/login"; }
+                throw new Error("Job not found or access denied.");
+            }
+            const job = await res.json();
+            currentJobData = job;
+            elTitle.textContent = `Step 2: Validate Data for Job #${job.id}`;
+            elSubtitle.textContent = `${job.original_filename} | Created: ${new Date(job.created_at).toLocaleString()}`;
+            elBadge.textContent = job.status;
+            if (job.status === "AWAITING_VALIDATION" || job.status === "SUBMISSION_FAILED") {
+                if (job.target_doctype.toLowerCase() === 'attendance' && job.attendance_year && job.attendance_month) {
+                    await loadProcessedGridAsMatrix(job.attendance_year, job.attendance_month);
+                } else {
+                    await loadProcessedGridAsList();
+                }
+                elActions.style.display = "flex";
+                if (job.status === "SUBMISSION_FAILED" && job.error_log && job.error_log.details) {
+                    errorPanel.style.display = 'block';
+                    errorSummary.textContent = job.error_log.summary || 'Some records failed to submit.';
+                    errorDetails.innerHTML = job.error_log.details.map(err => 
+                        `<div style="border-bottom: 1px solid #fee2e2; padding-bottom: 0.5rem; margin-bottom: 0.5rem;">
+                            <strong>Record #${err.record_index + 1} (Emp: ${err.record_data.employee}):</strong>
+                            <p style="color: #991b1b; margin-left: 1rem;">${err.error}</p>
+                        </div>`).join('');
+                }
+            } else if (["PROCESSING", "PENDING", "ANALYZING"].includes(job.status)) {
+                gridProcessedContainer.innerHTML = `<div style="padding:40px; text-align:center;">Status: ${job.status}. The page will refresh shortly...</div>`;
+                setTimeout(checkStatusPoller, 3000);
+            } else {
+                gridProcessedContainer.innerHTML = `<div style="padding:40px; text-align:center;">Job is ${job.status}. No data to display or edit.</div>`;
+            }
+        } catch (e) {
+            gridProcessedContainer.innerHTML = `<div style="padding:40px; text-align:center; color:red;">Error: ${e.message}</div>`;
+        }
+    }
+
+    async function loadProcessedGridAsMatrix(year, month) {
+        try {
+            const res = await apiCall(`/api/v1/conversions/${jobId}/data/processed`);
+            if (!res.ok) throw new Error("Processed data file not found.");
+            const records = await res.json();
+            updateStatsDashboard(records);
+            if (records.length === 0) { gridProcessedContainer.innerHTML = '<div style="padding:40px; text-align:center; color:#666;">0 Records Processed.</div>'; return; }
+            const { gridData } = pivotDataToGridFormat(records);
+            const daysInMonth = new Date(year, month, 0).getDate();
+            const dayColumns = Array.from({ length: daysInMonth }, (_, i) => ({ data: `${i + 1}`, title: `${i + 1}` }));
+            const columns = [ { data: 'Employee Code', title: 'Employee Code', readOnly: true, width: 120 }, { data: 'Employee Name', title: 'Employee Name', readOnly: true, width: 200 }, ...dayColumns.map(col => ({ ...col, type: 'dropdown', width: 60, source: ['', 'Present', 'Absent', 'On Leave', 'Half Day'] })) ];
+            gridProcessedContainer.innerHTML = "";
+            hotProcessed = new Handsontable(gridProcessedContainer, {
+                data: gridData, columns, rowHeaders: true, colHeaders: true, licenseKey: 'non-commercial-and-evaluation',
+                height: '100%', width: '100%', fixedColumnsLeft: 2, manualColumnResize: true,
+                dropdownMenu: true, filters: true, columnSorting: true, search: true, contextMenu: true,
+                afterChange: (changes, source) => {
+                    if (source === 'loadData') return;
+                    clearTimeout(autoSaveTimer);
+                    showSaveStatus('Saving draft...', false);
+                    autoSaveTimer = setTimeout(saveDraft, 2000);
+                }
+            });
+            checkForDraft();
+        } catch (e) { gridProcessedContainer.innerHTML = `<div style="padding:20px; color:red;">Load Error: ${e.message}</div>`; }
+    }
+
+    async function loadProcessedGridAsList() {
+        try {
+            const res = await apiCall(`/api/v1/conversions/${jobId}/data/processed`);
+            if (!res.ok) throw new Error("Processed data file not found.");
+            const data = await res.json();
+            updateStatsDashboard(data);
+            if (data.length === 0) { gridProcessedContainer.innerHTML = '<div style="padding:40px; text-align:center; color:#666;">0 Records Processed.</div>'; return; }
+            gridProcessedContainer.innerHTML = "";
+            const columns = Object.keys(data[0]).map(key => ({ data: key, title: key }));
+            hotProcessed = new Handsontable(gridProcessedContainer, {
+                data, columns, rowHeaders: true, colHeaders: true, licenseKey: 'non-commercial-and-evaluation',
+                height: '100%', width: '100%', stretchH: 'all', minSpareRows: 1, dropdownMenu: true, filters: true, columnSorting: true, search: true, contextMenu: true,
+                afterChange: (changes, source) => {
+                    if (source === 'loadData') return;
+                    clearTimeout(autoSaveTimer);
+                    showSaveStatus('Saving draft...', false);
+                    autoSaveTimer = setTimeout(saveDraft, 2000);
+                }
+            });
+            checkForDraft();
+        } catch (e) { gridProcessedContainer.innerHTML = `<div style="padding:20px; color:red;">Load Error: ${e.message}</div>`; }
+    }
+
+    async function loadRawGrid() {
+        try {
+            const res = await apiCall(`/api/v1/conversions/${jobId}/data/raw`);
+            if (!res.ok) throw new Error("Raw data file not found.");
+            const data = await res.json();
+            if (data.length === 0) { gridRawContainer.innerHTML = '<div style="padding:40px; text-align:center; color:#666;">No raw data available.</div>'; return; }
+            gridRawContainer.innerHTML = "";
+            const columns = Object.keys(data[0]).map(key => ({ data: key, title: key }));
+            hotRaw = new Handsontable(gridRawContainer, { data, columns, rowHeaders: true, colHeaders: true, licenseKey: 'non-commercial-and-evaluation', height: '100%', width: '100%', readOnly: true, stretchH: 'all', dropdownMenu: true, filters: true, columnSorting: true, search: true });
+        } catch (e) { gridRawContainer.innerHTML = `<div style="padding:20px; color:red;">Load Error: ${e.message}</div>`; }
+    }
+    
+    btnProceed.addEventListener("click", async () => {
+        if (!hotProcessed || !currentJobData) { alert("Data not loaded. Please wait or refresh the page."); return; }
+        btnProceed.disabled = true;
+        btnProceed.textContent = "Saving Edits...";
+        try {
+            const editedData = hotProcessed.getSourceData().filter(row => Object.values(row).some(val => val !== null && val !== ''));
+            let recordsToSave;
+            if (currentJobData.target_doctype.toLowerCase() === 'attendance') {
+                recordsToSave = unpivotGridToRecords(editedData, currentJobData.attendance_year, currentJobData.attendance_month);
+            } else {
+                recordsToSave = editedData;
+            }
+            const res = await apiCall(`/api/v1/conversions/${jobId}/data/processed`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ "data": recordsToSave })
+            });
+            if (res.ok) {
+                localStorage.removeItem(getDraftKey());
+                window.location.href = `/jobs/${jobId}/map-employees`;
+            } else {
+                const err = await res.json();
+                throw new Error(err.detail || "Failed to save edits.");
+            }
+        } catch (e) {
+            alert("Error: " + e.message);
+            btnProceed.disabled = false;
+            btnProceed.textContent = "Proceed to Employee Mapping";
+        }
+    });
+
+    checkStatusPoller();
+});
 </script>
 {% endblock %}

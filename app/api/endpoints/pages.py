@@ -13,11 +13,15 @@ async def login_page(request: Request):
     return templates.TemplateResponse("login.html", {"request": request})
 
 
+@router.get("/initial-setup", response_class=HTMLResponse, include_in_schema=False)
+async def initial_setup_page(request: Request):
+    """Serves the one-time administrator setup page."""
+    return templates.TemplateResponse("initial_setup.html", {"request": request})
+
+
 @router.get("/upload", response_class=HTMLResponse, include_in_schema=False)
 async def upload_page(request: Request):
-    """
-    Serves the main file upload page.
-    """
+    """Serves the main file upload page."""
     return templates.TemplateResponse(
         "upload.html", {"request": request, "active_page": "upload"}
     )
@@ -37,49 +41,25 @@ async def list_jobs_page(request: Request):
     )
 
 
-@router.get(
-    "/jobs/{job_id}/configure", response_class=HTMLResponse, include_in_schema=False
-)
+@router.get("/jobs/{job_id}/configure", response_class=HTMLResponse, include_in_schema=False)
 async def job_configure_page(request: Request, job_id: int):
-    """
-    Serves the new, interactive page for confirming the parsing configuration
-    after a file has been analyzed.
-    """
+    """Serves the interactive page for confirming parsing configuration."""
     return templates.TemplateResponse(
-        "job_configure.html",
-        {"request": request, "job_id": job_id, "active_page": "jobs"},
+        "job_configure.html", {"request": request, "job_id": job_id, "active_page": "jobs"}
     )
 
 
-@router.get(
-    "/jobs/{job_id}/map-employees", response_class=HTMLResponse, include_in_schema=False
-)
+@router.get("/jobs/{job_id}/map-employees", response_class=HTMLResponse, include_in_schema=False)
 async def job_map_employees_page(request: Request, job_id: int):
-    """
-    Serves the final step page for mapping extracted employees to ERPNext employees.
-    """
+    """Serves the final step page for mapping employees."""
     return templates.TemplateResponse(
-        "job_map_employees.html",
-        {"request": request, "job_id": job_id, "active_page": "jobs"},
-    )
-
-
-@router.get(
-    "/jobs/{job_id}/validate", response_class=HTMLResponse, include_in_schema=False
-)
-async def job_validate_page(request: Request, job_id: int):
-    """
-    Serves the data validation page (Step 2) for a job.
-    """
-    return templates.TemplateResponse(
-        "validate_job.html",
-        {"request": request, "job_id": job_id, "active_page": "jobs"},
+        "job_map_employees.html", {"request": request, "job_id": job_id, "active_page": "jobs"}
     )
 
 
 @router.get("/jobs/{job_id}", response_class=HTMLResponse, include_in_schema=False)
 async def job_detail_page(request: Request, job_id: int):
-    """Serves the detail page for a specific job. Data is fetched by JS."""
+    """Serves the detail/validation page for a specific job."""
     return templates.TemplateResponse(
         "job_detail.html", {"request": request, "job_id": job_id, "active_page": "jobs"}
     )
@@ -95,7 +75,41 @@ async def home_page(request: Request):
 
 @router.get("/settings", response_class=HTMLResponse, include_in_schema=False)
 async def settings_page(request: Request):
-    """Serves the settings page."""
+    """Serves the settings page for managing mapping profiles."""
     return templates.TemplateResponse(
         "settings.html", {"request": request, "active_page": "settings"}
     )
+
+
+@router.get("/admin", response_class=HTMLResponse, include_in_schema=False)
+async def admin_center_page(request: Request):
+    """Serves the Admin Center for user management."""
+    return templates.TemplateResponse(
+        "admin_center.html", {"request": request, "active_page": "admin"}
+    )
+
+
+@router.get("/sheet-maker", response_class=HTMLResponse, include_in_schema=False)
+async def sheet_maker_page(request: Request):
+    """Serves the new page for generating attendance sheets."""
+    return templates.TemplateResponse(
+        "sheet_maker.html", {"request": request, "active_page": "sheet-maker"}
+    )
+
+
+@router.get("/organizations", response_class=HTMLResponse, include_in_schema=False)
+async def organizations_page(request: Request):
+    """Serves the new page for Superadmins to manage organizations."""
+    return templates.TemplateResponse(
+        "organizations.html", {"request": request, "active_page": "organizations"}
+    )
+
+
+# --- START OF NEW ROUTE ---
+@router.get("/employees", response_class=HTMLResponse, include_in_schema=False)
+async def employees_page(request: Request):
+    """Serves the page for Managers to manage employees in their organization."""
+    return templates.TemplateResponse(
+        "employees.html", {"request": request, "active_page": "employees"}
+    )
+# --- END OF NEW ROUTE ---

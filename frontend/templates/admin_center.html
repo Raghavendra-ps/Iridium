@@ -1,0 +1,214 @@
+{% extends "dashboard_base.html" %}
+
+{% block title %}Admin Center{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1 class="card-title">User Management</h1>
+    <p style="color: var(--color-text-muted); margin-bottom: 1.5rem;">
+        Approve new user registrations and manage roles and permissions for all users in the system.
+    </p>
+    <div id="user-table-container"><p>Loading users...</p></div>
+</div>
+
+<!-- Modal for Editing User -->
+<div id="editUserModal" class="modal-backdrop" style="display: none;">
+    <div class="modal-content">
+        <h2 id="modal-title">Edit User</h2>
+        <form id="editUserForm">
+            <input type="hidden" id="edit-user-id">
+            <div class="form-group">
+                <label for="edit-role">Role</label>
+                <select id="edit-role" name="role" required>
+                    <option value="client">Client</option>
+                    <option value="employee">Employee</option>
+                    <option value="admin">Admin</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="edit-status">Account Status</label>
+                <select id="edit-status" name="status" required>
+                    <option value="pending">Pending Approval</option>
+                    <option value="active">Active</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="edit-is-active">Login Enabled</label>
+                <select id="edit-is-active" name="is_active" required>
+                    <option value="true">True (Can Log In)</option>
+                    <option value="false">False (Suspended)</option>
+                </select>
+            </div>
+            <div class="modal-actions">
+                <button type="button" id="cancelEditBtn" class="btn">Cancel</button>
+                <button type="submit" class="btn" style="background-color: var(--color-accent); color: white;">Save Changes</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+    #user-table-container table { width: 100%; border-collapse: collapse; text-align: left; }
+    #user-table-container th, #user-table-container td { padding: 12px 8px; border-bottom: 1px solid var(--color-border); }
+    #user-table-container th { font-weight: 600; }
+    .status-badge { padding: 4px 8px; border-radius: 99px; font-size: 0.8rem; font-weight: 500; text-transform: capitalize; }
+    .status-pending { background-color: #fef3c7; color: #92400e; }
+    .status-active { background-color: #dcfce7; color: #166534; }
+    .status-suspended { background-color: #fee2e2; color: #991b1b; }
+    .modal-backdrop { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+    .modal-content { background: white; padding: 2rem; border-radius: var(--radius-lg); width: 100%; max-width: 500px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+    .modal-content h2 { margin-top: 0; margin-bottom: 1.5rem; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 1rem; margin-top: 2rem; }
+    .form-group { margin-bottom: 1.5rem; }
+    .form-group label { display: block; margin-bottom: 8px; font-weight: 500; }
+    .form-group select { width: 100%; padding: 10px; border: 1px solid var(--color-border); border-radius: 8px; font-size: 1rem; }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function onPageLoad(token) {
+    const userTableContainer = document.getElementById('user-table-container');
+    const editModal = document.getElementById('editUserModal');
+    const editForm = document.getElementById('editUserForm');
+    const cancelBtn = document.getElementById('cancelEditBtn');
+    const modalTitle = document.getElementById('modal-title');
+    
+    let allUsers = [];
+
+    // --- START OF FIX: Use the robust apiCall helper that includes the auth token ---
+    const apiCall = (url, options = {}) => {
+        const defaultOptions = {
+            headers: { 'Authorization': `Bearer ${token}` }
+        };
+        const mergedOptions = {
+            ...defaultOptions,
+            ...options,
+            headers: {
+                ...defaultOptions.headers,
+                ...options.headers,
+            },
+        };
+        return fetch(url, mergedOptions);
+    };
+    // --- END OF FIX ---
+
+    async function loadUsers() {
+        try {
+            const response = await apiCall('/api/v1/admin/users');
+            if (!response.ok) {
+                if (response.status === 403) {
+                    alert("Access Denied. You must be an administrator to view this page.");
+                    window.location.href = "/home";
+                }
+                throw new Error("Failed to load users.");
+            }
+            allUsers = await response.json();
+            renderTable();
+        } catch (error) {
+            userTableContainer.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+        }
+    }
+
+    function renderTable() {
+        const table = document.createElement('table');
+        table.innerHTML = `
+            <thead>
+                <tr>
+                    <th>User ID</th><th>Email</th><th>Role</th>
+                    <th>Account Status</th><th>Login Status</th><th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${allUsers.map(user => `
+                    <tr>
+                        <td>${user.id}</td>
+                        <td>${user.email}</td>
+                        <td>${user.role}</td>
+                        <td><span class="status-badge status-${user.status}">${user.status}</span></td>
+                        <td><span class="status-badge ${user.is_active ? 'status-active' : 'status-suspended'}">${user.is_active ? 'Enabled' : 'Suspended'}</span></td>
+                        <td>
+                            <button class="btn edit-btn" data-user-id="${user.id}">Edit</button>
+                            ${user.status === 'pending' ? `<button class="btn approve-btn" data-user-id="${user.id}" style="background: #10b981; color: white;">Approve</button>` : ''}
+                        </td>
+                    </tr>
+                `).join('')}
+            </tbody>
+        `;
+        userTableContainer.innerHTML = '';
+        userTableContainer.appendChild(table);
+    }
+    
+    function openEditModal(userId) {
+        const user = allUsers.find(u => u.id === userId);
+        if (!user) return;
+        modalTitle.textContent = `Edit User: ${user.email}`;
+        document.getElementById('edit-user-id').value = user.id;
+        document.getElementById('edit-role').value = user.role;
+        document.getElementById('edit-status').value = user.status;
+        document.getElementById('edit-is-active').value = user.is_active.toString();
+        editModal.style.display = 'flex';
+    }
+
+    function closeEditModal() {
+        editModal.style.display = 'none';
+        editForm.reset();
+    }
+
+    userTableContainer.addEventListener('click', (e) => {
+        if (e.target.classList.contains('edit-btn')) {
+            openEditModal(parseInt(e.target.dataset.userId, 10));
+        }
+        if (e.target.classList.contains('approve-btn')) {
+            approveUser(parseInt(e.target.dataset.userId, 10));
+        }
+    });
+
+    cancelBtn.addEventListener('click', closeEditModal);
+
+    editForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const userId = document.getElementById('edit-user-id').value;
+        const payload = {
+            role: document.getElementById('edit-role').value,
+            status: document.getElementById('edit-status').value,
+            is_active: document.getElementById('edit-is-active').value === 'true'
+        };
+
+        try {
+            const response = await apiCall(`/api/v1/admin/users/${userId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            if (!response.ok) {
+                const err = await response.json();
+                throw new Error(err.detail || "Failed to update user.");
+            }
+            closeEditModal();
+            loadUsers();
+        } catch(error) {
+            alert(`Error: ${error.message}`);
+        }
+    });
+
+    async function approveUser(userId) {
+        if (!confirm("Are you sure you want to approve this user's account? They will be able to log in immediately.")) return;
+        const payload = { status: 'active' };
+        try {
+            const response = await apiCall(`/api/v1/admin/users/${userId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            if (!response.ok) throw new Error("Failed to approve user.");
+            loadUsers();
+        } catch(error) {
+            alert(`Error: ${error.message}`);
+        }
+    }
+
+    loadUsers();
+}
+</script>
+{% endblock %}

@@ -4,18 +4,13 @@ from fastapi import Depends, FastAPI, HTTPException
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from redis import Redis
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app.api.endpoints import (
-    auth,
-    conversions,
-    dashboard,
-    mappings,
-    organizations,
-    pages,
-    users,
-)
+from app.api.endpoints import (admin, auth, conversions, dashboard, employees,
+                               mappings, organizations, pages, sheets, users)
 from app.core.config import settings
+from app.db.models import User
 from app.db.session import get_db
 
 logging.basicConfig(level=logging.INFO)
@@ -27,11 +22,8 @@ app = FastAPI(
 )
 
 
-# --- START OF FIX: ADD THE get_redis DEPENDENCY BACK ---
+# --- DEPENDENCIES AND HEALTH CHECKS ---
 def get_redis():
-    """
-    Dependency function that provides a Redis client connection.
-    """
     try:
         redis_client = Redis.from_url(settings.REDIS_URI, decode_responses=True)
         redis_client.ping()
@@ -39,64 +31,53 @@ def get_redis():
     except Exception as e:
         logger.error(f"Could not connect to Redis: {e}")
         raise HTTPException(status_code=503, detail="Could not connect to Redis.")
-
-
-    try:
-        redis_client = Redis.from_url(settings.REDIS_URI, decode_responses=True)
-        redis_client.ping()
-        yield redis_client
-    except Exception as e:
-        logger.error(f"Could not connect to Redis: {e}")
-        raise HTTPException(status_code=503, detail="Could not connect to Redis.")
-# --- END OF FIX ---
-
 
 @app.get("/health", tags=["Health"])
 def health_check(db: Session = Depends(get_db), redis: Redis = Depends(get_redis)):
     try:
-        db.execute("SELECT 1")
+        db.execute(text("SELECT 1"))
         db_status = "ok"
     except Exception as e:
         logger.error(f"Database connection failed: {e}")
         db_status = "error"
         raise HTTPException(status_code=503, detail="Database connection error.")
-
     redis_status = "ok"
-    return {
-        "status": "ok",
-        "dependencies": {"database": db_status, "redis": redis_status},
-    }
+    return {"status": "ok", "dependencies": {"database": db_status, "redis": redis_status}}
 
 
-@app.get("/", tags=["Root"], include_in_schema=False)
-def read_root():
-    return RedirectResponse(url="/home")
-
-
-# --- Include API Routers ---
+# --- ROUTER INCLUSION (CORRECT ORDER) ---
+# 1. API Routers
 app.include_router(auth.router, prefix=f"{settings.API_V1_STR}/auth", tags=["auth"])
 app.include_router(users.router, prefix=f"{settings.API_V1_STR}/users", tags=["users"])
-app.include_router(
-    conversions.router,
-    prefix=f"{settings.API_V1_STR}/conversions",
-    tags=["conversions"],
-)
+app.include_router(admin.router, prefix=f"{settings.API_V1_STR}/admin", tags=["admin"])
+app.include_router(conversions.router, prefix=f"{settings.API_V1_STR}/conversions", tags=["conversions"])
+
+# --- START OF CHANGE ---
 app.include_router(
     organizations.router,
-    prefix=f"{settings.API_V1_STR}/linked-organizations",
+    prefix=f"{settings.API_V1_STR}/organizations", # Updated prefix
     tags=["organizations"],
 )
 app.include_router(
-    dashboard.router,
-    prefix=f"{settings.API_V1_STR}/dashboard",
-    tags=["dashboard"],
+    employees.router,
+    prefix=f"{settings.API_V1_STR}/employees", # New router
+    tags=["employees"],
 )
-app.include_router(
-    mappings.router,
-    prefix=f"{settings.API_V1_STR}/mapping-profiles",
-    tags=["mappings"],
-)
+# --- END OF CHANGE ---
 
+app.include_router(dashboard.router, prefix=f"{settings.API_V1_STR}/dashboard", tags=["dashboard"])
+app.include_router(mappings.router, prefix=f"{settings.API_V1_STR}/mapping-profiles", tags=["mappings"])
+app.include_router(sheets.router, prefix=f"{settings.API_V1_STR}/sheets", tags=["sheets"])
+
+# 2. Page Router (HTML serving pages)
 app.include_router(pages.router, tags=["pages"])
 
+# 3. Root Endpoint
+@app.get("/", include_in_schema=False)
+def read_root(db: Session = Depends(get_db)):
+    if db.query(User).count() == 0:
+        return RedirectResponse(url="/initial-setup")
+    return RedirectResponse(url="/home")
+
+# 4. Static Files (Mounted last)
 app.mount("/static", StaticFiles(directory="frontend/static"), name="static")

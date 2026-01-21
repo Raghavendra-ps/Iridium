@@ -3,17 +3,16 @@
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <!-- START: Title Change -->
-        <title>{% block title %}Gretis{% endblock %}</title>
-        <!-- END: Title Change -->
-        <link
-            href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
-            rel="stylesheet"
-        />
-        <link
-            rel="stylesheet"
-            href="https://cdn.jsdelivr.net/npm/handsontable/dist/handsontable.full.min.css"
-        />
+        <title>{% block title %}Dashboard{% endblock %}</title>
+        
+        <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png">
+        <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32x32.png">
+        <link rel="icon" type="image/png" sizes="16x16" href="/static/favicon-16x16.png">
+        <link rel="manifest" href="/static/site.webmanifest">
+        <link rel="shortcut icon" href="/static/favicon.ico">
+        
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/handsontable/dist/handsontable.full.min.css" />
         <script src="https://cdn.jsdelivr.net/npm/handsontable/dist/handsontable.full.min.js"></script>
         <style>
             :root {
@@ -26,12 +25,16 @@
                 --radius-lg: 12px;
             }
             * { box-sizing: border-box; margin: 0; padding: 0; }
-            body { font-family: "Inter", sans-serif; background: #f8fafc; color: #334155; }
+            body { 
+                font-family: "Inter", sans-serif; 
+                background: #f4f1eb; 
+                color: #334155; 
+            }
             a { color: var(--color-accent); text-decoration: none; }
             .container { max-width: 1400px; margin: 0 auto; padding: 0 24px; }
             .header { display: flex; justify-content: space-between; align-items: center; padding: 16px 0; background: white; position: sticky; top: 0; z-index: 10; }
             .header-brand { display: flex; align-items: center; gap: 12px; text-decoration: none; }
-            .header-logo { height: 65px; /* Adjust height as needed */ }
+            .header-logo { height: 32px; }
             .header-actions { display: flex; align-items: center; gap: 16px; }
             .user-info { color: var(--color-text-muted); }
             .btn { padding: 8px 16px; border: 1px solid var(--color-border); border-radius: 8px; font-weight: 600; cursor: pointer; transition: background-color 0.2s; text-decoration: none; color: #334155; background-color: #fff; display: inline-flex; align-items: center; font-size: 0.9rem; }
@@ -47,18 +50,15 @@
             .nav-list a.active { background-color: var(--color-primary); color: white; }
             .card { background: white; border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: 24px; box-shadow: var(--shadow-sm); margin-bottom: 24px; }
             .card-title { font-size: 1.25rem; font-weight: 600; color: var(--color-text); margin-bottom: 1rem; }
-            .ht-clone-left { z-index: 5 !important; }
         </style>
     </head>
     <body>
         <div style="background: white; border-bottom: 1px solid var(--color-border);">
             <div class="container">
                 <header class="header">
-                    <!-- START: Logo and Brand Name Change -->
                     <a href="/home" class="header-brand">
                         <img src="/static/images/logo.svg" alt="Gretis Logo" class="header-logo">
                     </a>
-                    <!-- END: Logo and Brand Name Change -->
                     <div class="header-actions">
                         <div class="user-info">Logged in as: <strong id="user-email">...</strong></div>
                         <a href="/settings" class="btn">Settings</a>
@@ -72,29 +72,39 @@
                 <aside class="sidebar">
                     <nav>
                         <ul class="nav-list">
-                            <li><a href="/home" class="{% if active_page == 'home' %}active{% endif %}">Home</a></li>
-                            <li><a href="/upload" class="{% if active_page == 'upload' %}active{% endif %}">New Conversion</a></li>
-                            <li><a href="/jobs" class="{% if active_page == 'jobs' %}active{% endif %}">My Jobs</a></li>
+                            <li id="home-nav-link" style="display: none;"><a href="/home" class="{% if active_page == 'home' %}active{% endif %}">Home</a></li>
+                            <li id="upload-nav-link" style="display: none;"><a href="/upload" class="{% if active_page == 'upload' %}active{% endif %}">New Conversion</a></li>
+                            <li id="jobs-nav-link" style="display: none;"><a href="/jobs" class="{% if active_page == 'jobs' %}active{% endif %}">My Jobs</a></li>
+                            <li id="sheet-maker-nav-link" style="display: none;"><a href="/sheet-maker" class="{% if active_page == 'sheet-maker' %}active{% endif %}">Sheet Generator</a></li>
+                            
+                            <!-- Admin Section Separator -->
+                            <div id="admin-section-divider" style="display: none; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--color-border);"></div>
+                            
+                            <li id="org-nav-link" style="display: none;">
+                                <a href="/organizations" class="{% if active_page == 'organizations' %}active{% endif %}">Organizations</a>
+                            </li>
+                            <li id="admin-nav-link" style="display: none;">
+                                <a href="/admin" class="{% if active_page == 'admin' %}active{% endif %}">User Management</a>
+                            </li>
                         </ul>
                     </nav>
                 </aside>
                 <main class="main-content">
-                    {% block content %}Gretis{% endblock %}
+                    {% block content %}{% endblock %}
                 </main>
             </div>
         </div>
 
-
         <script>
+            let currentUser = null;
+
             document.addEventListener("DOMContentLoaded", async function () {
                 const token = localStorage.getItem("access_token");
-                const userEmailElement = document.getElementById("user-email");
-                const logoutBtn = document.getElementById("logoutBtn");
-
                 if (!token) {
                     window.location.href = "/login";
                     return;
                 }
+
                 try {
                     const userResponse = await fetch("/api/v1/users/me", {
                         headers: { Authorization: `Bearer ${token}` },
@@ -105,19 +115,54 @@
                         return;
                     }
                     const userData = await userResponse.json();
-                    userEmailElement.textContent = userData.email;
+                    currentUser = userData;
+
+                    const userEmailElement = document.getElementById("user-email");
+                    if (userEmailElement) {
+                        userEmailElement.textContent = userData.email;
+                    }
+                    
+                    const userRole = userData.role;
+                    const navLinks = {
+                        home: document.getElementById("home-nav-link"),
+                        upload: document.getElementById("upload-nav-link"),
+                        jobs: document.getElementById("jobs-nav-link"),
+                        sheetMaker: document.getElementById("sheet-maker-nav-link"),
+                        admin: document.getElementById("admin-nav-link"),
+                        organizations: document.getElementById("org-nav-link"), // New link
+                        adminDivider: document.getElementById("admin-section-divider"), // Divider
+                    };
+
+                    // Updated role permissions
+                    const permissions = {
+                        superadmin: ['home', 'upload', 'jobs', 'sheetMaker', 'admin', 'organizations', 'adminDivider'],
+                        employee: ['home', 'upload', 'jobs', 'sheetMaker'],
+                        manager: ['home', 'jobs'] // Changed 'client' to 'manager'
+                    };
+
+                    const allowedLinks = permissions[userRole] || [];
+                    for (const [linkName, element] of Object.entries(navLinks)) {
+                        if (element && allowedLinks.includes(linkName)) {
+                            element.style.display = 'block';
+                        }
+                    }
+
                 } catch (e) {
+                    localStorage.removeItem("access_token");
                     window.location.href = "/login";
                     return;
                 }
 
-                logoutBtn.addEventListener("click", () => {
-                    localStorage.removeItem("access_token");
-                    window.location.href = "/login";
-                });
+                const logoutBtn = document.getElementById("logoutBtn");
+                if(logoutBtn) {
+                    logoutBtn.addEventListener("click", () => {
+                        localStorage.removeItem("access_token");
+                        window.location.href = "/login";
+                    });
+                }
 
                 if (typeof onPageLoad === "function") {
-                    onPageLoad(token);
+                    onPageLoad(token, currentUser);
                 }
             });
         </script>
