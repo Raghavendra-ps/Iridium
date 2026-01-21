@@ -1,6 +1,10 @@
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
+from sqlalchemy.orm import Session
 from fastapi.templating import Jinja2Templates
+
+from app.db.session import get_db
+from app.db.models import User
 
 router = APIRouter()
 
@@ -8,8 +12,15 @@ templates = Jinja2Templates(directory="frontend/templates")
 
 
 @router.get("/login", response_class=HTMLResponse, include_in_schema=False)
-async def login_page(request: Request):
-    """Serves the login page."""
+async def login_page(request: Request, db: Session = Depends(get_db)):
+    """
+    Serves the login page.
+    If no users exist in the database, it redirects to the initial setup page.
+    """
+    user_count = db.query(User).count()
+    if user_count == 0:
+        return RedirectResponse(url="/initial-setup")
+    
     return templates.TemplateResponse("login.html", {"request": request})
 
 
@@ -83,7 +94,7 @@ async def settings_page(request: Request):
 
 @router.get("/admin", response_class=HTMLResponse, include_in_schema=False)
 async def admin_center_page(request: Request):
-    """Serves the Admin Center for user management."""
+    """Serves the new Admin Center for user management."""
     return templates.TemplateResponse(
         "admin_center.html", {"request": request, "active_page": "admin"}
     )
@@ -105,11 +116,9 @@ async def organizations_page(request: Request):
     )
 
 
-# --- START OF NEW ROUTE ---
 @router.get("/employees", response_class=HTMLResponse, include_in_schema=False)
 async def employees_page(request: Request):
     """Serves the page for Managers to manage employees in their organization."""
     return templates.TemplateResponse(
         "employees.html", {"request": request, "active_page": "employees"}
     )
-# --- END OF NEW ROUTE ---

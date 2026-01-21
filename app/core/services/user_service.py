@@ -16,16 +16,20 @@ def get_user_by_id(db: Session, *, user_id: int) -> User | None:
 def create_user(db: Session, *, user_in: UserCreate, organization_id: int, role: str = "manager") -> User:
     """
     Creates a new user and assigns them to an organization.
-    The user is created with status 'active' by default as they are being created by an admin.
+    The user is created with status 'active' by default if created by an admin,
+    otherwise 'pending'.
     """
     hashed_password = get_password_hash(user_in.password)
+
+    # Determine status based on role being assigned
+    status = "active" if role in ["superadmin", "employee"] else "pending"
 
     db_user = User(
         email=user_in.email,
         hashed_password=hashed_password,
         organization_id=organization_id,
         role=role,
-        status='active' # Users created by admins are active by default
+        status=status
     )
 
     db.add(db_user)
@@ -34,16 +38,18 @@ def create_user(db: Session, *, user_in: UserCreate, organization_id: int, role:
     return db_user
 
 def authenticate_user(db: Session, *, email: str, password: str) -> Optional[User]:
-    """Authenticates a user."""
+    """
+    Authenticates a user, checking for password, active status, and approval.
+    """
     user = get_user_by_email(db, email=email)
 
     if not user or not verify_password(password, user.hashed_password):
         return None
 
-    # We still keep these checks for legacy users or manual DB changes
     if user.status != "active":
-        user.authentication_error = "Account is not active."
+        user.authentication_error = "Account is pending admin approval."
         return user
+
     if not user.is_active:
         user.authentication_error = "Account has been suspended."
         return user

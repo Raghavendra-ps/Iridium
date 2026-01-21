@@ -7,6 +7,7 @@ from redis import Redis
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+# This import remains the same, as all endpoint modules are needed.
 from app.api.endpoints import (admin, auth, conversions, dashboard, employees,
                                mappings, organizations, pages, sheets, users)
 from app.core.config import settings
@@ -45,39 +46,26 @@ def health_check(db: Session = Depends(get_db), redis: Redis = Depends(get_redis
     return {"status": "ok", "dependencies": {"database": db_status, "redis": redis_status}}
 
 
-# --- ROUTER INCLUSION (CORRECT ORDER) ---
-# 1. API Routers
+# --- ROUTER INCLUSION (CORRECT AND FINAL ORDER) ---
+# 1. All API Routers are included first.
 app.include_router(auth.router, prefix=f"{settings.API_V1_STR}/auth", tags=["auth"])
 app.include_router(users.router, prefix=f"{settings.API_V1_STR}/users", tags=["users"])
 app.include_router(admin.router, prefix=f"{settings.API_V1_STR}/admin", tags=["admin"])
 app.include_router(conversions.router, prefix=f"{settings.API_V1_STR}/conversions", tags=["conversions"])
-
-# --- START OF CHANGE ---
-app.include_router(
-    organizations.router,
-    prefix=f"{settings.API_V1_STR}/organizations", # Updated prefix
-    tags=["organizations"],
-)
-app.include_router(
-    employees.router,
-    prefix=f"{settings.API_V1_STR}/employees", # New router
-    tags=["employees"],
-)
-# --- END OF CHANGE ---
-
+app.include_router(organizations.router, prefix=f"{settings.API_V1_STR}/organizations", tags=["organizations"])
+app.include_router(employees.router, prefix=f"{settings.API_V1_STR}/employees", tags=["employees"])
 app.include_router(dashboard.router, prefix=f"{settings.API_V1_STR}/dashboard", tags=["dashboard"])
 app.include_router(mappings.router, prefix=f"{settings.API_V1_STR}/mapping-profiles", tags=["mappings"])
 app.include_router(sheets.router, prefix=f"{settings.API_V1_STR}/sheets", tags=["sheets"])
 
-# 2. Page Router (HTML serving pages)
+# 2. The Page Router (which handles HTML pages) is included next.
 app.include_router(pages.router, tags=["pages"])
 
-# 3. Root Endpoint
+# 3. The Root Endpoint is now simple and dependency-free.
 @app.get("/", include_in_schema=False)
-def read_root(db: Session = Depends(get_db)):
-    if db.query(User).count() == 0:
-        return RedirectResponse(url="/initial-setup")
-    return RedirectResponse(url="/home")
+def read_root():
+    """Redirects all root traffic to the /login page."""
+    return RedirectResponse(url="/login")
 
-# 4. Static Files (Mounted last)
+# 4. Static Files are mounted last.
 app.mount("/static", StaticFiles(directory="frontend/static"), name="static")

@@ -49,9 +49,8 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            // --- START OF CHANGE: Simplified Logic ---
-            // The initial setup check is now handled by the backend.
-            // This script now only checks for messages from other pages.
+            // The setup check is now handled by the backend.
+            // This script now only checks for messages passed in the URL.
             const params = new URLSearchParams(window.location.search);
             const statusMessage = document.getElementById('status-message');
 
@@ -63,7 +62,6 @@
                 statusMessage.textContent = 'Admin account created successfully! Please log in.';
                 statusMessage.classList.add('success');
             }
-            // --- END OF CHANGE ---
         });
 
         document.getElementById('loginForm').addEventListener('submit', async function(event) {
