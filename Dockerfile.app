@@ -31,7 +31,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     tesseract-ocr \
     tesseract-ocr-eng \
     curl \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
+    && apt-get clean && rm -rf /var/lib/apt/lists/* \
+    && mkdir -p /app/uploads \
+    && chown -R appuser:appuser /app/uploads
 # --- END OF FIX ---
 
 COPY --from=builder /app/.venv/ ./.venv/

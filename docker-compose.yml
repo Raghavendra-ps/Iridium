@@ -3,21 +3,20 @@
 services:
   nginx:
     image: nginx:1.25-alpine
+    container_name: iridium-testing-nginx
     ports:
       - "9094:80"
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf
-    # --- START OF FIX ---
-    # This ensures Nginx only starts after the API is fully running and healthy.
     depends_on:
       api:
         condition: service_healthy
-    # --- END OF FIX ---
 
   db:
     image: postgres:15-alpine
+    container_name: iridium-testing-db
     volumes:
-      - postgres_data:/var/lib/postgresql/data/
+      - iridium-testing-postgres-data:/var/lib/postgresql/data/
     env_file:
       - ./.env
     environment:
@@ -32,8 +31,9 @@ services:
 
   redis:
     image: redis:7-alpine
+    container_name: iridium-testing-redis
     volumes:
-      - redis_data:/data
+      - iridium-testing-redis-data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -44,11 +44,12 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.app
+    container_name: iridium-testing-api
     command: >
       sh -c "python -m app.initial_data &&
       gunicorn --bind 0.0.0.0:8000 -w 4 -k uvicorn.workers.UvicornWorker app.main:app"
     volumes:
-      - uploaded_files:/app/uploads
+      - iridium-testing-uploaded-files:/app/uploads
     env_file:
       - ./.env
     depends_on:
@@ -56,23 +57,21 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    # --- START OF FIX ---
-    # Add a healthcheck that queries our /health endpoint.
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 20s
-    # --- END OF FIX ---
 
   worker:
     build:
       context: .
       dockerfile: Dockerfile.worker
+    container_name: iridium-testing-worker
     command: celery -A app.infrastructure.celery_app.celery worker --loglevel=info --concurrency=8
     volumes:
-      - uploaded_files:/app/uploads
+      - iridium-testing-uploaded-files:/app/uploads
     env_file:
       - ./.env
     depends_on:
@@ -84,6 +83,6 @@ services:
         condition: service_healthy
 
 volumes:
-  postgres_data:
-  redis_data:
-  uploaded_files:
+  iridium-testing-postgres-data:
+  iridium-testing-redis-data:
+  iridium-testing-uploaded-files:
