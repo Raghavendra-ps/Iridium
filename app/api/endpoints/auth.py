@@ -44,11 +44,6 @@ def initial_admin_setup(*, db: Session = Depends(get_db), user_in: user_schemas.
     return superadmin
 
 
-# The public /register endpoint is now disabled. New users (managers)
-# will be created by superadmins via the new admin panel.
-# @router.post("/register", ...)
-
-
 @router.post("/login", response_model=user_schemas.Token)
 def login_for_access_token(db: Session = Depends(get_db), form_data: OAuth2PasswordRequestForm = Depends()) -> dict:
     """OAuth2 compatible token login."""
@@ -61,3 +56,40 @@ def login_for_access_token(db: Session = Depends(get_db), form_data: OAuth2Passw
 
     access_token = security.create_access_token(subject=user.id)
     return {"access_token": access_token, "token_type": "bearer"}
+
+
+@router.get("/organizations-public")
+def list_orgs_public(db: Session = Depends(get_db)):
+    """Publicly list organizations for the registration dropdown."""
+    return db.query(Organization).all()
+
+@router.post("/register", response_model=user_schemas.User, status_code=status.HTTP_201_CREATED)
+def register_user(*, db: Session = Depends(get_db), user_in: user_schemas.UserCreate):
+    # 1. Email check
+    if user_service.get_user_by_email(db, email=user_in.email):
+        raise HTTPException(status_code=400, detail="Email already registered.")
+
+    org_id = user_in.organization_id
+
+    # 2. Organization Logic
+    if not org_id:
+        if not user_in.organization_name:
+            raise HTTPException(status_code=400, detail="Organization Name is required to create a new organization.")
+        # Check if name exists
+        if db.query(Organization).filter(Organization.name == user_in.organization_name).first():
+            raise HTTPException(status_code=400, detail="An organization with this name already exists.")
+        
+        new_org = Organization(name=user_in.organization_name)
+        db.add(new_org)
+        db.commit()
+        db.refresh(new_org)
+        org_id = new_org.id
+
+    # 3. Create User as 'client'
+    new_user = user_service.create_user(
+        db=db,
+        user_in=user_in,
+        organization_id=org_id,
+        role="client" 
+    )
+    return new_user

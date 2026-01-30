@@ -8,7 +8,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 # This import remains the same, as all endpoint modules are needed.
-from app.api.endpoints import (admin, auth, conversions, dashboard, employees,
+from app.api.endpoints import (admin, attendance, auth, conversions, dashboard, employees,
                                mappings, organizations, pages, sheets, users)
 from app.core.config import settings
 from app.db.models import User
@@ -36,16 +36,30 @@ def get_redis():
 
 @app.get("/health", tags=["Health"])
 def health_check(db: Session = Depends(get_db), redis: Redis = Depends(get_redis)):
+    db_status = "error"
+    redis_status = "error"
+    
     try:
+        # Explicitly use text() for SQLAlchemy 2.0
         db.execute(text("SELECT 1"))
         db_status = "ok"
     except Exception as e:
-        logger.error(f"Database connection failed: {e}")
-        db_status = "error"
-        raise HTTPException(status_code=503, detail="Database connection error.")
-    redis_status = "ok"
-    return {"status": "ok", "dependencies": {"database": db_status, "redis": redis_status}}
+        logger.error(f"Database connection failed: {str(e)}")
+        # We don't raise here yet, so we can check Redis too
+        
+    try:
+        redis.ping()
+        redis_status = "ok"
+    except Exception as e:
+        logger.error(f"Redis connection failed: {str(e)}")
 
+    if db_status == "ok" and redis_status == "ok":
+        return {"status": "ok", "dependencies": {"database": db_status, "redis": redis_status}}
+    
+    raise HTTPException(
+        status_code=503, 
+        detail={"status": "unhealthy", "database": db_status, "redis": redis_status}
+    )
 
 # --- ROUTER INCLUSION (CORRECT AND FINAL ORDER) ---
 # 1. All API Routers are included first.
@@ -54,13 +68,15 @@ app.include_router(users.router, prefix=f"{settings.API_V1_STR}/users", tags=["u
 app.include_router(admin.router, prefix=f"{settings.API_V1_STR}/admin", tags=["admin"])
 app.include_router(conversions.router, prefix=f"{settings.API_V1_STR}/conversions", tags=["conversions"])
 app.include_router(organizations.router, prefix=f"{settings.API_V1_STR}/organizations", tags=["organizations"])
+app.include_router(organizations.router, prefix=f"{settings.API_V1_STR}/linked-organizations", tags=["organizations"])
 app.include_router(employees.router, prefix=f"{settings.API_V1_STR}/employees", tags=["employees"])
 app.include_router(dashboard.router, prefix=f"{settings.API_V1_STR}/dashboard", tags=["dashboard"])
 app.include_router(mappings.router, prefix=f"{settings.API_V1_STR}/mapping-profiles", tags=["mappings"])
 app.include_router(sheets.router, prefix=f"{settings.API_V1_STR}/sheets", tags=["sheets"])
-
-# 2. The Page Router (which handles HTML pages) is included next.
+app.include_router(attendance.router, prefix=f"{settings.API_V1_STR}/attendance", tags=["attendance"])
+app.include_router(sheets.router, prefix=f"{settings.API_V1_STR}/sheets", tags=["sheets"])
 app.include_router(pages.router, tags=["pages"])
+app.include_router(attendance.router, prefix=f"{settings.API_V1_STR}/attendance", tags=["attendance"])
 
 # 3. The Root Endpoint is now simple and dependency-free.
 @app.get("/", include_in_schema=False)

@@ -1,278 +1,198 @@
 {% extends "dashboard_base.html" %}
 
-{% block title %}Attendance Sheet Maker - Gretis DataPort{% endblock %}
+{% block title %}Attendance Sheet{% endblock %}
 
 {% block content %}
 <div id="sheet-maker-container">
-    <!-- Top Configuration Bar -->
-    <div class="card" id="setup-card">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-            <h1 class="card-title" style="margin: 0;">Attendance Sheet Generator</h1>
-            <span id="save-status" style="color: var(--color-text-muted); font-size: 0.8rem; transition: opacity 0.5s;"></span>
-        </div>
-        <p style="color: var(--color-text-muted); margin-top: 4px; margin-bottom: 1.5rem;">
-            Generate a blank sheet, or select an organization to pre-fill with employees. All edits are auto-saved to your browser.
+    <div class="card">
+        <h1 class="card-title">Attendance Creation</h1>
+        <p style="color: var(--color-text-muted); margin-top: -10px; margin-bottom: 20px; font-size: 0.9rem;">
+            Quickly generate a monthly grid. Select an organisation to load its pre-defined employee list.
         </p>
-        
-        <div id="setup-form" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; align-items: flex-end; padding-bottom: 2rem; border-bottom: 1px solid var(--color-border);">
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; align-items: flex-end;">
             <div class="form-group">
-                <label for="target_org_id">Target Organization (Optional)</label>
-                <select id="target_org_id"><option value="">Loading...</option></select>
+                <label style="display:block; margin-bottom:5px; font-weight:600; font-size:0.8rem;">1. Organisation</label>
+                <select id="target_org_id" style="width:100%; padding:10px; border:1px solid var(--color-border); border-radius:8px;">
+                    <option value="">-- Manual Entry --</option>
+                </select>
             </div>
             <div class="form-group">
-                <label for="num_employees">Number of Blank Rows</label>
-                <input type="number" id="num_employees" value="10" min="1" max="500">
+                <label style="display:block; margin-bottom:5px; font-weight:600; font-size:0.8rem;">2. Blank Rows</label>
+                <input type="number" id="num_rows" value="10" min="1" style="width:100%; padding:10px; border:1px solid var(--color-border); border-radius:8px;">
             </div>
-            <div class="form-group"><label for="attendance_year">Year</label><select id="attendance_year"></select></div>
-            <div class="form-group"><label for="attendance_month">Month</label><select id="attendance_month"></select></div>
-            <div class="form-group"><button type="button" id="generateBtn" class="btn" style="background-color: var(--color-accent); color: white; width: 100%; padding: 12px;">Generate Sheet</button></div>
+            <div class="form-group">
+                <label style="display:block; margin-bottom:5px; font-weight:600; font-size:0.8rem;">3. Year</label>
+                <select id="year" style="width:100%; padding:10px; border:1px solid var(--color-border); border-radius:8px;"></select>
+            </div>
+            <div class="form-group">
+                <label style="display:block; margin-bottom:5px; font-weight:600; font-size:0.8rem;">4. Month</label>
+                <select id="month" style="width:100%; padding:10px; border:1px solid var(--color-border); border-radius:8px;"></select>
+            </div>
+            <button id="generateBtn" class="btn" style="background:var(--color-primary); color:white; padding:11px;">Generate Grid</button>
         </div>
-        
-        <div id="statusMessage" style="margin-top: 1.5rem; font-size: 0.9rem; min-height: 1.2rem;"></div>
     </div>
 
-    <!-- Grid Section (initially hidden) -->
-    <div id="grid-section" class="card" style="display: none;">
-        <div id="stats-bar" style="display: flex; justify-content: space-around; background: #f9fafb; padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem;"></div>
-        <div class="grid-toolbar">
-            <div class="toolbar-group">
-                <label for="prefill-input">Pre-fill Grid:</label>
-                <input type="text" id="prefill-input" placeholder="e.g., P" style="width: 80px;">
-                <button id="prefill-btn" class="btn">Apply</button>
+    <!-- Grid Container -->
+    <div id="grid-card" class="card" style="display: none;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.2rem;">
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <span style="font-size: 0.85rem; font-weight: 600;">Bulk Entry:</span>
+                <input type="text" id="bulk-val" placeholder="P" style="width: 50px; padding: 5px; border-radius: 6px; border: 1px solid #cbd5e1; text-align:center;">
+                <button onclick="applyBulk()" class="btn" style="padding: 5px 12px; font-size: 0.8rem;">Apply All</button>
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <button id="saveToDbBtn" class="btn" style="background:#10b981; color:white; border:none; padding: 8px 20px;">Save to Dashboard</button>
             </div>
         </div>
-        <!-- START OF FIX: Replaced flex-grow with an explicit height -->
-        <div id="sheet-grid" style="width: 100%; height: 65vh; overflow: hidden; border: 1px solid var(--color-border);"></div>
-        <!-- END OF FIX -->
-        <div style="display: flex; justify-content: flex-end; gap: 1rem; margin-top: 1.5rem;">
-            <button id="exportBtn" class="btn">Export to Excel</button>
-            <button id="saveBtn" class="btn" style="background-color: #10b981; color: white;">Save as New Job</button>
-        </div>
+        
+        <div id="attendance-grid" style="width: 100%; height: 500px; overflow: hidden; border: 1px solid var(--color-border); border-radius: 8px;"></div>
     </div>
 </div>
-
-<style>
-    .sidebar { display: none; }
-    .main-content { width: 100%; max-width: 100%; }
-    .dashboard-layout { gap: 0; }
-
-    #sheet-maker-container { display: flex; flex-direction: column; }
-    .form-group { margin-bottom: 0; }
-    .form-group label { display: block; margin-bottom: 8px; font-weight: 500; }
-    .form-group select, .form-group input { width: 100%; padding: 10px; border: 1px solid var(--color-border); border-radius: 8px; background-color: white; font-size: 1rem; }
-    .grid-toolbar { display: flex; align-items: center; justify-content: flex-start; padding-bottom: 1rem; }
-    .toolbar-group { display: flex; align-items: center; gap: 8px; }
-    .toolbar-group input { padding: 6px 10px; border: 1px solid var(--color-border); border-radius: 6px; }
-    .stat-item { text-align: center; }
-    .stat-item-value { font-size: 1.5rem; font-weight: 600; color: var(--color-primary); }
-    .stat-item-label { font-size: 0.8rem; color: var(--color-text-muted); margin-top: 4px; text-transform: uppercase; }
-    .spinner { border: 4px solid #f3f4f6; border-top: 4px solid var(--color-accent); border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto; }
-    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-</style>
 {% endblock %}
 
 {% block scripts %}
 <script>
-document.addEventListener("DOMContentLoaded", function () {
-    const token = localStorage.getItem("access_token");
-    if (!token) { window.location.href = "/login"; return; }
-
-    const orgSelect = document.getElementById('target_org_id');
-    const numEmployeesInput = document.getElementById('num_employees');
-    const yearSelect = document.getElementById('attendance_year');
-    const monthSelect = document.getElementById('attendance_month');
-    const generateBtn = document.getElementById('generateBtn');
-    const statusMessage = document.getElementById('statusMessage');
-    const gridSection = document.getElementById('grid-section');
-    const sheetGridContainer = document.getElementById('sheet-grid');
-    const prefillInput = document.getElementById('prefill-input');
-    const prefillBtn = document.getElementById('prefill-btn');
-    const exportBtn = document.getElementById('exportBtn');
-    const saveBtn = document.getElementById('saveBtn');
-    const statsBar = document.getElementById('stats-bar');
-    const saveStatusEl = document.getElementById('save-status');
-    
-    let hot;
-    let autoSaveTimer;
-
-    const apiCall = (url, options = {}) => fetch(url, { headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, ...options });
-
-    const getDraftKey = () => `sheet-maker-draft-${yearSelect.value}-${monthSelect.value}`;
-    function showSaveStatus(message, fadeOut = true) {
-        saveStatusEl.textContent = message;
-        saveStatusEl.style.opacity = '1';
-        if (fadeOut) { setTimeout(() => { saveStatusEl.style.opacity = '0'; }, 3000); }
-    }
-    function saveDraft() {
-        if (!hot) return;
-        const data = hot.getSourceData();
-        const draft = { data, orgId: orgSelect.value, year: yearSelect.value, month: monthSelect.value };
-        localStorage.setItem(getDraftKey(), JSON.stringify(draft));
-        showSaveStatus(`Draft saved at ${new Date().toLocaleTimeString()}`);
-    }
-
-    const currentYear = new Date().getFullYear();
-    for (let i = -2; i <= 2; i++) yearSelect.add(new Option(currentYear + i, currentYear + i));
-    yearSelect.value = currentYear;
-    const months = ["January","February","March","April","May","June","July","August","September","October","November","December"];
-    months.forEach((m, i) => monthSelect.add(new Option(m, i + 1)));
-    monthSelect.value = new Date().getMonth() + 1;
-
-    async function loadOrganizations() {
-        orgSelect.innerHTML = '<option value="">-- Manual Entry --</option>';
-        try {
-            const res = await (await apiCall('/api/v1/linked-organizations/')).json();
-            res.forEach(org => orgSelect.add(new Option(`${org.instance_name}`, org.id)));
-        } catch (e) { console.error("Could not load orgs", e); }
-    }
-
-    orgSelect.addEventListener('change', () => {
-        const orgSelected = orgSelect.value !== "";
-        numEmployeesInput.disabled = orgSelected;
-        generateBtn.textContent = orgSelected ? 'Load Employees & Generate' : 'Generate Blank Sheet';
-    });
-    
-    generateBtn.addEventListener('click', async () => {
-        generateBtn.disabled = true;
-        generateBtn.textContent = 'Loading...';
-        showStatus('Generating grid...', 'info');
-        let employeeData = [];
-        const orgId = orgSelect.value;
-        try {
-            if (orgId) {
-                const res = await apiCall('/api/v1/sheets/get-employees-for-sheet', {
-                    method: 'POST', body: JSON.stringify({ target_org_id: parseInt(orgId) })
-                });
-                if (!res.ok) throw new Error((await res.json()).detail);
-                const employees = await res.json();
-                employeeData = employees.map(e => ({ 'Employee Code': e.employee_code, 'Employee Name': e.employee_name }));
-            } else {
-                const numRows = parseInt(numEmployeesInput.value, 10);
-                for (let i = 0; i < numRows; i++) {
-                    employeeData.push({ 'Employee Code': '', 'Employee Name': '' });
-                }
-            }
-            renderGrid(employeeData);
-            gridSection.style.display = 'block';
-            showStatus('Grid generated successfully. You can now fill in the attendance.', 'success');
-        } catch (error) {
-            showStatus(error.message, 'error');
-        } finally {
-            generateBtn.disabled = false;
-            orgSelect.dispatchEvent(new Event('change'));
-        }
-    });
-
-    function renderGrid(data) {
-        const year = parseInt(yearSelect.value);
-        const month = parseInt(monthSelect.value);
-        const daysInMonth = new Date(year, month, 0).getDate();
-        const dayColumns = Array.from({ length: daysInMonth }, (_, i) => ({ data: `${i + 1}`, title: `${i + 1}` }));
-        const columns = [
-            { data: 'Employee Code', title: 'Employee Code', width: 120 },
-            { data: 'Employee Name', title: 'Employee Name', width: 200 },
-            ...dayColumns
-        ];
-        sheetGridContainer.innerHTML = "";
-        hot = new Handsontable(sheetGridContainer, {
-            data, columns, rowHeaders: true, colHeaders: true, licenseKey: 'non-commercial-and-evaluation',
-            height: '100%', width: '100%', manualColumnResize: true, manualRowResize: true,
-            minSpareRows: 1, contextMenu: true, dropdownMenu: true, filters: true,
-            afterChange: (changes, source) => {
-                if (source === 'loadData') return;
-                updateLiveStats();
-                clearTimeout(autoSaveTimer);
-                showSaveStatus('Saving draft...', false);
-                autoSaveTimer = setTimeout(saveDraft, 2000);
-            }
+let hot;
+function onPageLoad(token, currentUser) {
+    const apiCall = async (url, options = {}) => {
+        const response = await fetch(url, { 
+            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, 
+            ...options 
         });
-        updateLiveStats();
-    }
-
-    function updateLiveStats() {
-        if (!hot) return;
-        const totalEmployees = hot.getSourceData().filter(r => r['Employee Code']).length;
-        const daysInMonth = new Date(yearSelect.value, monthSelect.value, 0).getDate();
-        let recordsToCreate = 0;
-        hot.getData().forEach(row => {
-            for(let i = 2; i < row.length; i++) {
-                if (row[i]) recordsToCreate++;
-            }
-        });
-        statsBar.innerHTML = `
-            <div class="stat-item"><div class="stat-item-value">${totalEmployees}</div><div class="stat-item-label">Employees</div></div>
-            <div class="stat-item"><div class="stat-item-value">${daysInMonth}</div><div class="stat-item-label">Days in Month</div></div>
-            <div class="stat-item"><div class="stat-item-value">${recordsToCreate}</div><div class="stat-item-label">Data Points</div></div>`;
-    }
-
-    prefillBtn.addEventListener('click', () => {
-        if (!hot) return;
-        const fillValue = prefillInput.value.trim().toUpperCase();
-        if (!fillValue) { alert("Please enter a value to pre-fill (e.g., 'P')."); return; }
-        const changes = [];
-        const rowCount = hot.countRows() - hot.getSettings().minSpareRows;
-        const dayProps = hot.getSettings().columns.slice(2).map(c => c.data);
-        for (let r = 0; r < rowCount; r++) {
-            for (const prop of dayProps) {
-                changes.push([r, prop, fillValue]);
-            }
-        }
-        hot.setDataAtRowProp(changes);
-    });
-
-    exportBtn.addEventListener('click', async () => {
-        if (!hot) return;
-        const data = hot.getSourceData().filter(row => row['Employee Code']);
-        const payload = { data, year: parseInt(yearSelect.value), month: parseInt(monthSelect.value) };
-        try {
-            const res = await apiCall('/api/v1/sheets/create-sheet-from-data', { 
-                method: 'POST', 
-                body: JSON.stringify(payload) 
-            });
-            if (!res.ok) throw new Error((await res.json()).detail);
-            const blob = await res.blob();
-            const filename = `Generated_Attendance_${payload.year}-${String(payload.month).padStart(2,'0')}.xlsx`;
-            const a = document.createElement('a'); a.href = window.URL.createObjectURL(blob);
-            a.download = filename; a.click(); window.URL.revokeObjectURL(a.href);
-        } catch (e) { showStatus(`Export failed: ${e.message}`, 'error'); }
-    });
-
-    saveBtn.addEventListener('click', async () => {
-        if (!hot || !orgSelect.value) {
-            showStatus('You must select a Target Organization to save the sheet as a job.', 'error');
+        if (response.status === 401) {
+            alert("Unauthorized. Please log in again.");
+            window.location.href = "/login";
             return;
         }
-        saveBtn.disabled = true;
-        saveBtn.textContent = 'Saving...';
-        const data = hot.getSourceData().filter(row => row['Employee Code']);
-        const payload = {
-            data, year: parseInt(yearSelect.value), month: parseInt(monthSelect.value),
-            target_org_id: parseInt(orgSelect.value)
-        };
-        try {
-            const res = await apiCall('/api/v1/sheets/save-as-job', { method: 'POST', body: JSON.stringify(payload) });
-            if (!res.ok) {
-                const errorData = await res.json();
-                throw new Error(errorData.detail || 'Failed to save job.');
-            }
-            const job = await res.json();
-            localStorage.removeItem(getDraftKey());
-            alert(`Successfully created Job #${job.id}. You will now be redirected to the validation page.`);
-            window.location.href = `/jobs/${job.id}`;
-        } catch (e) {
-            showStatus(`Failed to save job: ${e.message}`, 'error');
-            saveBtn.disabled = false;
-            saveBtn.textContent = 'Save as New Job';
-        }
-    });
+        return response;
+    };
 
-    function showStatus(message, type) {
-        statusMessage.textContent = message;
-        statusMessage.style.color = type === 'error' ? 'red' : (type === 'success' ? 'green' : '#333');
+    // Populate Year/Month
+    const yearSel = document.getElementById('year');
+    const monthSel = document.getElementById('month');
+    const curYear = new Date().getFullYear();
+    for(let y=curYear-1; y<=curYear+1; y++) yearSel.add(new Option(y, y));
+    yearSel.value = curYear;
+    
+    const months = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+    months.forEach((m, i) => monthSel.add(new Option(m, i+1)));
+    monthSel.value = new Date().getMonth() + 1;
+
+    async function loadOrgs() {
+        const res = await apiCall('/api/v1/organizations/');
+        if(!res || !res.ok) return;
+        const orgs = await res.json();
+        const select = document.getElementById('target_org_id');
+        orgs.forEach(o => select.add(new Option(o.name, o.id)));
     }
 
-    loadOrganizations();
-    orgSelect.dispatchEvent(new Event('change'));
-});
+    document.getElementById('generateBtn').onclick = async () => {
+        const orgId = document.getElementById('target_org_id').value;
+        const rowCount = document.getElementById('num_rows').value;
+        
+        let initialData = [];
+        if (orgId) {
+            const res = await apiCall(`/api/v1/employees/?org_id=${orgId}`);
+            if (res.ok) {
+                const employees = await res.json();
+                // --- FIX: Check if we actually got an array ---
+                if (Array.isArray(employees)) {
+                    initialData = employees.map(e => [e.employee_code, e.employee_name]);
+                }
+            }
+        } 
+        
+        if (initialData.length === 0) {
+            for(let i=0; i<rowCount; i++) initialData.push(['', '']);
+        }
+
+        renderGrid(initialData);
+        document.getElementById('grid-card').style.display = 'block';
+    };
+
+    function renderGrid(baseData) {
+        const y = parseInt(yearSel.value);
+        const m = parseInt(monthSel.value);
+        const days = new Date(y, m, 0).getDate();
+        const colHeaders = ['Emp Code', 'Emp Name'];
+        const columns = [{width: 90}, {width: 180}];
+        
+        for(let d=1; d<=days; d++) {
+            colHeaders.push(d.toString());
+            columns.push({width: 35, type: 'dropdown', source: ['', 'P', 'A', 'L', 'HD']});
+        }
+
+        const container = document.getElementById('attendance-grid');
+        container.innerHTML = '';
+        hot = new Handsontable(container, {
+            data: baseData,
+            colHeaders: colHeaders,
+            columns: columns,
+            rowHeaders: true,
+            minSpareRows: 1,
+            manualColumnResize: true,
+            licenseKey: 'non-commercial-and-evaluation',
+            stretchH: 'all',
+            contextMenu: true
+        });
+    }
+
+    window.applyBulk = () => {
+        const val = document.getElementById('bulk-val').value.toUpperCase();
+        if(!val) return;
+        const rows = hot.countRows() - 1;
+        const cols = hot.countCols() - 1;
+        const changes = [];
+        for(let r=0; r<rows; r++) {
+            for(let c=2; c<=cols; c++) changes.push([r, c, val]);
+        }
+        hot.setDataAtCell(changes);
+    };
+
+    document.getElementById('saveToDbBtn').onclick = async () => {
+        const btn = document.getElementById('saveToDbBtn');
+        btn.disabled = true; btn.textContent = "Saving...";
+
+        const rawData = hot.getData();
+        const headers = hot.getColHeader();
+        const formattedData = [];
+
+        rawData.forEach(row => {
+            if(!row[0]) return;
+            const obj = { "Employee Code": row[0], "Employee Name": row[1] || row[0] };
+            for(let i=2; i<row.length; i++) {
+                if(row[i]) {
+                    // Shorthand Normalizer
+                    let status = row[i];
+                    if(status === 'P') status = 'Present';
+                    if(status === 'A') status = 'Absent';
+                    if(status === 'L') status = 'On Leave';
+                    if(status === 'HD') status = 'Half Day';
+                    obj[headers[i]] = status;
+                }
+            }
+            formattedData.push(obj);
+        });
+
+        const payload = {
+            year: parseInt(yearSel.value),
+            month: parseInt(monthSel.value),
+            data: formattedData,
+            target_org_id: document.getElementById('target_org_id').value || null
+        };
+
+        const res = await apiCall('/api/v1/sheets/save-as-job', { method: 'POST', body: JSON.stringify(payload) });
+        if(res.ok) {
+            alert("Document saved successfully!");
+            window.location.href = "/home";
+        } else {
+            alert("Failed to save. Check your connection.");
+            btn.disabled = false; btn.textContent = "Save to Dashboard";
+        }
+    };
+
+    loadOrgs();
+}
 </script>
 {% endblock %}

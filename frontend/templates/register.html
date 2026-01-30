@@ -4,42 +4,57 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Register</title>
-    
-    <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png">
-    <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32x32.png">
-    <link rel="icon" type="image/png" sizes="16x16" href="/static/favicon-16x16.png">
-    <link rel="manifest" href="/static/site.webmanifest">
-    <link rel="shortcut icon" href="/static/favicon.ico">
-
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #f4f1eb; }
-        .container { background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); width: 320px; text-align: center; }
-        .logo { height: 40px; margin-bottom: 1.5rem; }
-        h1 { text-align: center; color: #333; margin-bottom: 1.5rem; font-size: 1.5rem; }
-        .form-group { margin-bottom: 1rem; text-align: left; }
-        label { display: block; margin-bottom: 0.5rem; color: #555; }
-        input { width: 100%; padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
-        button { width: 100%; padding: 0.75rem; border: none; border-radius: 4px; background-color: #007bff; color: white; font-size: 1rem; cursor: pointer; }
-        button:hover { background-color: #0056b3; }
-        .status { color: red; text-align: center; margin-top: 1rem; font-size: 0.9rem; }
-        .login-link { text-align: center; margin-top: 1.5rem; font-size: 0.9rem; color: #555; }
-        .login-link a { color: #007bff; text-decoration: none; }
+        body { font-family: 'Inter', sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; background-color: #f4f1eb; margin: 0;}
+        .container { background: white; padding: 2.5rem; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.1); width: 420px; }
+        .logo { height: 40px; margin-bottom: 1.5rem; display: block; margin-left: auto; margin-right: auto; }
+        h1 { text-align: center; color: #1e293b; margin-bottom: 1.5rem; font-size: 1.5rem; font-weight: 700; }
+        .form-group { margin-bottom: 1.2rem; }
+        label { display: block; margin-bottom: 0.5rem; color: #475569; font-weight: 600; font-size: 0.85rem; }
+        input { width: 100%; padding: 0.75rem; border: 1px solid #cbd5e1; border-radius: 8px; box-sizing: border-box; font-size: 1rem; transition: border-color 0.2s; }
+        input:focus { outline: none; border-color: #2563eb; ring: 2px #bfdbfe; }
+        
+        /* Search/Create Logic UI */
+        .search-wrapper { display: flex; gap: 8px; align-items: center; }
+        #create-org-btn { display: none; background: #10b981; color: white; border: none; border-radius: 6px; padding: 0 15px; height: 42px; cursor: pointer; white-space: nowrap; font-weight: 600; font-size: 0.8rem; }
+        #selection-display { margin-top: 8px; min-height: 20px; }
+        .org-badge { display: inline-block; background: #dcfce7; color: #166534; padding: 4px 10px; border-radius: 6px; font-size: 0.8rem; font-weight: 600; border: 1px solid #bbf7d0; }
+
+        button.submit-btn { width: 100%; padding: 0.85rem; border: none; border-radius: 8px; background-color: #2563eb; color: white; font-size: 1rem; font-weight: 600; cursor: pointer; margin-top: 1rem; transition: background 0.2s; }
+        button.submit-btn:hover { background-color: #1d4ed8; }
+        .status { color: #dc2626; text-align: center; margin-top: 1rem; font-size: 0.85rem; min-height: 1.2rem; }
+        .login-link { text-align: center; margin-top: 1.5rem; font-size: 0.9rem; color: #64748b; }
+        .login-link a { color: #2563eb; text-decoration: none; font-weight: 600; }
     </style>
 </head>
 <body>
     <div class="container">
         <img src="/static/images/logo.svg" alt="Gretis Logo" class="logo">
-        <h1>Create an Account</h1>
+        <h1>Create Client Account</h1>
         <form id="registerForm">
             <div class="form-group">
-                <label for="email">Email</label>
-                <input type="email" id="email" name="email" required>
+                <label>Work Email</label>
+                <input type="email" id="email" required placeholder="email@company.com">
             </div>
             <div class="form-group">
-                <label for="password">Password</label>
-                <input type="password" id="password" name="password" minlength="8" required>
+                <label>Password</label>
+                <input type="password" id="password" required minlength="8" placeholder="••••••••">
             </div>
-            <button type="submit">Register</button>
+
+            <div class="form-group">
+                <label>Organisation</label>
+                <div class="search-wrapper">
+                    <input type="text" id="org-search" placeholder="Type to find or create..." list="org-list" autocomplete="off">
+                    <button type="button" id="create-org-btn">Create New</button>
+                </div>
+                <datalist id="org-list"></datalist>
+                <input type="hidden" id="selected-org-id" value="">
+                <input type="hidden" id="new-org-name" value="">
+                <div id="selection-display"></div>
+            </div>
+
+            <button type="submit" class="submit-btn">Register</button>
         </form>
         <p id="status-message" class="status"></p>
         <div class="login-link">
@@ -48,34 +63,90 @@
     </div>
 
     <script>
-        document.getElementById('registerForm').addEventListener('submit', async function(event) {
-            event.preventDefault();
-            const form = event.target;
-            const email = form.email.value;
-            const password = form.password.value;
-            const statusMessage = document.getElementById('status-message');
-            statusMessage.textContent = '';
+        let allOrgs = [];
+        const orgInput = document.getElementById('org-search');
+        const createBtn = document.getElementById('create-org-btn');
+        const selectedOrgIdInput = document.getElementById('selected-org-id');
+        const newOrgNameInput = document.getElementById('new-org-name');
+        const selectionDisplay = document.getElementById('selection-display');
 
+        // Load existing organizations for the dropdown
+        async function loadOrgs() {
             try {
-                const response = await fetch('/api/v1/auth/register', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ email, password })
-                });
+                const res = await fetch('/api/v1/auth/organizations-public');
+                allOrgs = await res.json();
+                const list = document.getElementById('org-list');
+                list.innerHTML = allOrgs.map(o => `<option value="${o.name}">`).join('');
+            } catch (e) {
+                console.error("Failed to load organizations");
+            }
+        }
 
-                if (response.status === 201) {
-                    // On successful registration, redirect to the login page with a success message
-                    window.location.href = '/login?registered=true';
-                } else {
-                    const errorData = await response.json();
-                    statusMessage.textContent = errorData.detail || 'Registration failed. Please try again.';
-                }
-            } catch (error) {
-                statusMessage.textContent = 'An error occurred. Please try again later.';
+        orgInput.addEventListener('input', (e) => {
+            const val = e.target.value.trim();
+            const match = allOrgs.find(o => o.name.toLowerCase() === val.toLowerCase());
+            
+            if (match) {
+                selectedOrgIdInput.value = match.id;
+                newOrgNameInput.value = "";
+                createBtn.style.display = 'none';
+                selectionDisplay.innerHTML = `<span class="org-badge">Selected: ${match.name}</span>`;
+            } else if (val.length >= 2) {
+                selectedOrgIdInput.value = "";
+                createBtn.style.display = 'block';
+                selectionDisplay.innerHTML = `<small style="color:#e17055">Organisation not found in system.</small>`;
+            } else {
+                selectedOrgIdInput.value = "";
+                createBtn.style.display = 'none';
+                selectionDisplay.innerHTML = "";
             }
         });
+
+        createBtn.addEventListener('click', () => {
+            const name = orgInput.value.trim();
+            if(!name) return;
+            newOrgNameInput.value = name;
+            selectedOrgIdInput.value = "NEW";
+            createBtn.style.display = 'none';
+            selectionDisplay.innerHTML = `<span class="org-badge" style="background:#eff6ff; color:#1e40af; border-color:#dbeafe;">Above organisation will be created</span>`;
+        });
+
+        document.getElementById('registerForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const statusMessage = document.getElementById('status-message');
+            statusMessage.textContent = "";
+
+            const payload = {
+                email: document.getElementById('email').value,
+                password: document.getElementById('password').value,
+                organization_id: selectedOrgIdInput.value === "NEW" ? null : (selectedOrgIdInput.value ? parseInt(selectedOrgIdInput.value) : null),
+                organization_name: selectedOrgIdInput.value === "NEW" ? newOrgNameInput.value : null
+            };
+
+            if (!payload.organization_id && !payload.organization_name) {
+                statusMessage.textContent = "Please select or create an organisation.";
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/v1/auth/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (res.ok) {
+                    window.location.href = '/login?registered=true';
+                } else {
+                    const err = await res.json();
+                    statusMessage.textContent = err.detail || "Registration failed.";
+                }
+            } catch (error) {
+                statusMessage.textContent = "Server error. Please try again later.";
+            }
+        });
+
+        loadOrgs();
     </script>
 </body>
 </html>

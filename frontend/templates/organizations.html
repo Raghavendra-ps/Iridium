@@ -1,0 +1,197 @@
+{% extends "dashboard_base.html" %}
+{% block title %}Organisation & Employee Setup{% endblock %}
+
+{% block content %}
+<div id="org-main-view">
+    <div class="card">
+        <h1 class="card-title">Create New Organisation</h1>
+        <form id="newOrgForm" style="display: flex; gap: 1rem; align-items: flex-end;">
+            <div style="flex-grow: 1;">
+                <label style="display:block; margin-bottom:8px; font-weight:600; font-size:0.9rem;">Organisation Name</label>
+                <input type="text" id="org_name" required placeholder="e.g., Acme Corp" style="width:100%; padding:10px; border:1px solid var(--color-border); border-radius:8px;">
+            </div>
+            <button type="submit" class="btn" style="background:var(--color-accent); color:white; padding:11px 20px;">Create Organisation</button>
+        </form>
+    </div>
+
+    <div class="card">
+        <h2 class="card-title">All Organisations</h2>
+        <div id="orgs-list-container">
+            <p>Loading organisations...</p>
+        </div>
+    </div>
+</div>
+
+<!-- Hidden Employee Setup Area -->
+<div id="employee-setup-view" style="display: none;">
+    <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem;">
+            <div>
+                <h1 id="setup-title" class="card-title" style="margin:0;">Employee Setup</h1>
+                <p id="setup-subtitle" style="color:var(--color-text-muted); margin-top:5px;"></p>
+            </div>
+            <button onclick="closeEmployeeSetup()" class="btn">← Back to Organisations</button>
+        </div>
+        
+        <p style="background:#f8fafc; padding:1rem; border-radius:8px; border-left:4px solid var(--color-accent); margin-bottom:1.5rem; font-size:0.9rem;">
+            <strong>Pro Tip:</strong> You can copy-paste directly from Excel. Enter Code, Name, and Email for each employee.
+        </p>
+
+        <div id="employee-grid" style="width:100%; height:450px; overflow:hidden; border:1px solid #e2e8f0; border-radius: 8px;"></div>
+
+        <div style="margin-top:1.5rem; display:flex; justify-content:flex-end; gap:10px;">
+            <div id="save-status" style="align-self:center; font-size:0.9rem; font-weight: 600;"></div>
+            <button id="saveEmployeesBtn" class="btn" style="background:#10b981; color:white; padding:10px 25px;">Save Employee List</button>
+        </div>
+    </div>
+</div>
+
+<style>
+    .org-card { border: 1px solid var(--color-border); border-radius: 12px; padding: 1.2rem; display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; background: white; }
+    .org-info strong { font-size: 1.1rem; color: var(--color-primary); }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let hotEmployees;
+let currentOrgId = null;
+
+function onPageLoad(token, currentUser) {
+    // Robust API Helper
+    const apiCall = async (url, options = {}) => {
+        const response = await fetch(url, { 
+            headers: { 
+                'Authorization': `Bearer ${token}`, 
+                'Content-Type': 'application/json' 
+            }, 
+            ...options 
+        });
+        if (response.status === 401) {
+            alert("Session expired. Please log in again.");
+            window.location.href = "/login";
+            return;
+        }
+        return response;
+    };
+
+    async function loadOrgs() {
+        const res = await apiCall('/api/v1/organizations/');
+        if (!res.ok) return;
+        const orgs = await res.json();
+        const container = document.getElementById('orgs-list-container');
+        
+        if(orgs.length === 0) {
+            container.innerHTML = `<p style="color:var(--color-text-muted)">No organisations found.</p>`;
+            return;
+        }
+
+        container.innerHTML = orgs.map(org => `
+            <div class="org-card">
+                <div class="org-info">
+                    <strong>${org.name}</strong>
+                    <p>Organisation ID: ${org.id}</p>
+                </div>
+                <div style="display:flex; gap:8px;">
+                    <button class="btn" style="border-color:var(--color-accent); color:var(--color-accent)" onclick="openEmployeeSetup(${org.id}, '${org.name}')">Employee Setup</button>
+                    <button class="btn btn-danger" onclick="deleteOrg(${org.id})">Delete</button>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    document.getElementById('newOrgForm').onsubmit = async (e) => {
+        e.preventDefault();
+        const name = document.getElementById('org_name').value;
+        const res = await apiCall('/api/v1/organizations/', { method: 'POST', body: JSON.stringify({ name }) });
+        if(res.ok) {
+            document.getElementById('org_name').value = '';
+            loadOrgs();
+        } else {
+            const err = await res.json();
+            alert(err.detail || "Failed to create organisation.");
+        }
+    };
+
+    window.openEmployeeSetup = async (id, name) => {
+        currentOrgId = id;
+        document.getElementById('org-main-view').style.display = 'none';
+        document.getElementById('employee-setup-view').style.display = 'block';
+        document.getElementById('setup-subtitle').textContent = `Manage the roster for ${name}`;
+        
+        // --- FIX: Fetch existing employees using the correct query param ---
+        const res = await apiCall(`/api/v1/employees/?org_id=${id}`);
+        if (!res.ok) {
+            alert("Failed to load employee list.");
+            return;
+        }
+        const data = await res.json();
+        
+        // Format for grid
+        const tableData = data.map(e => [e.employee_code, e.employee_name, e.email || '']);
+        if(tableData.length === 0) tableData.push(['', '', '']); 
+
+        const container = document.getElementById('employee-grid');
+        container.innerHTML = '';
+        hotEmployees = new Handsontable(container, {
+            data: tableData,
+            colHeaders: ['Employee Code', 'Full Name', 'Email (Required for Login)'],
+            columns: [{type:'text'}, {type:'text'}, {type:'text'}],
+            rowHeaders: true,
+            minSpareRows: 1,
+            width: '100%',
+            height: 450,
+            licenseKey: 'non-commercial-and-evaluation',
+            contextMenu: true,
+            stretchH: 'all'
+        });
+    };
+
+    document.getElementById('saveEmployeesBtn').onclick = async () => {
+        const btn = document.getElementById('saveEmployeesBtn');
+        const status = document.getElementById('save-status');
+        btn.disabled = true;
+        status.textContent = "Saving to database...";
+        status.style.color = "#475569";
+
+        const rawData = hotEmployees.getData();
+        const employees = rawData
+            .filter(row => row[0] && row[1]) // Only rows with code and name
+            .map(row => ({ code: row[0].toString(), name: row[1].toString(), email: row[2] ? row[2].toString() : null }));
+
+        try {
+            const res = await apiCall(`/api/v1/employees/sync/${currentOrgId}`, {
+                method: 'POST',
+                body: JSON.stringify(employees)
+            });
+            if(res.ok) {
+                status.style.color = "#10b981";
+                status.textContent = "✓ Employee list updated!";
+                setTimeout(() => { status.textContent = ""; }, 3000);
+            } else {
+                throw new Error("Save failed");
+            }
+        } catch (e) {
+            status.style.color = "#dc2626";
+            status.textContent = "Error saving changes.";
+        } finally {
+            btn.disabled = false;
+        }
+    };
+
+    window.closeEmployeeSetup = () => {
+        document.getElementById('org-main-view').style.display = 'block';
+        document.getElementById('employee-setup-view').style.display = 'none';
+        loadOrgs();
+    };
+
+    window.deleteOrg = async (id) => {
+        if(!confirm("Warning: Deleting this organisation will remove all linked users and employees. Continue?")) return;
+        const res = await apiCall(`/api/v1/organizations/${id}`, { method: 'DELETE' });
+        if(res.ok) loadOrgs();
+    };
+
+    loadOrgs();
+}
+</script>
+{% endblock %}

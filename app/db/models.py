@@ -11,14 +11,9 @@ class Organization(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, unique=True, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-
-    # An organization can have many users (managers)
-    users = relationship("User", back_populates="organization")
-    # An organization can have many manually entered employees
+    users = relationship("User", back_populates="organization", cascade="all, delete-orphan")
     employees = relationship("Employee", back_populates="organization", cascade="all, delete-orphan")
-    # An organization can have zero or one ERPNext link
     erpnext_link = relationship("LinkedOrganization", back_populates="organization", uselist=False, cascade="all, delete-orphan")
-
 
 class User(Base):
     __tablename__ = "users"
@@ -26,17 +21,10 @@ class User(Base):
     email = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=False)
     is_active = Column(Boolean, default=True)
-    
-    # Every user must belong to an organization.
-    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False)
-    
-    # Roles are now: 'superadmin', 'employee', 'manager'.
-    # Default for new registrations will be 'manager'.
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=True)
     role = Column(String, nullable=False, default="manager")
-    
     status = Column(String, nullable=False, default="pending")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-
     organization = relationship("Organization", back_populates="users")
     jobs = relationship("ConversionJob", back_populates="owner", cascade="all, delete-orphan")
     mapping_profiles = relationship("MappingProfile", back_populates="owner", cascade="all, delete-orphan")
@@ -49,7 +37,7 @@ class Employee(Base):
     employee_code = Column(String, nullable=False)
     employee_name = Column(String, nullable=False)
     is_active = Column(Boolean, default=True)
-
+    email = Column(String, nullable=True)
     organization = relationship("Organization", back_populates="employees")
 
 

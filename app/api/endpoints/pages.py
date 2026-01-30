@@ -44,14 +44,6 @@ async def register_page(request: Request):
     return templates.TemplateResponse("register.html", {"request": request})
 
 
-@router.get("/jobs", response_class=HTMLResponse, include_in_schema=False)
-async def list_jobs_page(request: Request):
-    """Serves the page listing all jobs. Data is fetched by JS."""
-    return templates.TemplateResponse(
-        "jobs_list.html", {"request": request, "active_page": "jobs"}
-    )
-
-
 @router.get("/jobs/{job_id}/configure", response_class=HTMLResponse, include_in_schema=False)
 async def job_configure_page(request: Request, job_id: int):
     """Serves the interactive page for confirming parsing configuration."""
@@ -121,4 +113,11 @@ async def employees_page(request: Request):
     """Serves the page for Managers to manage employees in their organization."""
     return templates.TemplateResponse(
         "employees.html", {"request": request, "active_page": "employees"}
+    )
+    
+@router.get("/check-attendance", response_class=HTMLResponse, include_in_schema=False)
+async def check_attendance_page(request: Request):
+    """Serves the personal attendance view for employees."""
+    return templates.TemplateResponse(
+        "check_attendance.html", {"request": request, "active_page": "check-attendance"}
     )

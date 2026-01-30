@@ -36,10 +36,34 @@ class JobStatusResponse(job_schemas.Job):
 
 
 @router.get("/", response_model=list[dict])
-def list_jobs(*, db: Session = Depends(get_db), current_user: User = Depends(dependencies.get_current_user)):
-    jobs = job_service.get_jobs_by_owner(db, owner_id=current_user.id)
-    return [{"id": job.id, "original_filename": job.original_filename, "target_doctype": job.target_doctype, "created_at": job.created_at.strftime("%Y-%m-%d %H:%M") + " UTC", "status": job.status} for job in jobs]
-
+def list_jobs(
+    *, 
+    db: Session = Depends(get_db), 
+    current_user: User = Depends(dependencies.get_current_active_user)
+):
+    """
+    Returns filtered data for the Home Dashboard:
+    - SuperAdmin: Everything from all users.
+    - Manager: Their own conversion jobs.
+    - Client: Their own saved sheets/docs.
+    """
+    query = db.query(ConversionJob)
+    
+    if current_user.role != 'superadmin':
+        # Filter by owner for everyone except SuperAdmins
+        query = query.filter(ConversionJob.owner_id == current_user.id)
+    
+    jobs = query.order_by(ConversionJob.created_at.desc()).all()
+    
+    return [{
+        "id": job.id,
+        "original_filename": job.original_filename,
+        "target_doctype": job.target_doctype,
+        "created_at": job.created_at.strftime("%Y-%m-%d %H:%M"),
+        "status": job.status,
+        # Only show the owner email to superadmins
+        "owner_email": job.owner.email if current_user.role == 'superadmin' else None
+    } for job in jobs]
 
 @router.post("/upload-for-analysis")
 def upload_for_analysis(
