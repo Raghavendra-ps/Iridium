@@ -16,6 +16,7 @@ from app.db.models import LinkedOrganization, User
 from app.db.session import get_db
 from app.infrastructure.celery_app import celery
 from app.infrastructure.erpnext_client import ERPNextClient
+from app.models.conversions import ConversionJob
 
 router = APIRouter()
 UPLOAD_DIR = Path("/app/uploads")

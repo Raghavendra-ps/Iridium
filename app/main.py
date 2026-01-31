@@ -72,11 +72,10 @@ app.include_router(organizations.router, prefix=f"{settings.API_V1_STR}/linked-o
 app.include_router(employees.router, prefix=f"{settings.API_V1_STR}/employees", tags=["employees"])
 app.include_router(dashboard.router, prefix=f"{settings.API_V1_STR}/dashboard", tags=["dashboard"])
 app.include_router(mappings.router, prefix=f"{settings.API_V1_STR}/mapping-profiles", tags=["mappings"])
-app.include_router(sheets.router, prefix=f"{settings.API_V1_STR}/sheets", tags=["sheets"])
 app.include_router(attendance.router, prefix=f"{settings.API_V1_STR}/attendance", tags=["attendance"])
 app.include_router(sheets.router, prefix=f"{settings.API_V1_STR}/sheets", tags=["sheets"])
 app.include_router(pages.router, tags=["pages"])
-app.include_router(attendance.router, prefix=f"{settings.API_V1_STR}/attendance", tags=["attendance"])
+
 
 # 3. The Root Endpoint is now simple and dependency-free.
 @app.get("/", include_in_schema=False)

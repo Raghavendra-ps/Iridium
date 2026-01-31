@@ -303,23 +303,27 @@
                 select.innerHTML = `<option value="">Error loading</option>`;
             }
         }
-
+        
+        // --- START OF FIX: Corrected API endpoint and data handling ---
         async function loadOrganizations() {
             try {
-                const response = await apiCall("/api/v1/linked-organizations/");
+                const response = await apiCall("/api/v1/organizations/");
                 if (!response.ok)
                     throw new Error("Failed to fetch organizations");
                 const orgs = await response.json();
                 targetOrgSelect.innerHTML =
                     '<option value="" disabled selected>-- Select a Target --</option>';
-                if (orgs.length === 0) {
+                
+                const linkedOrgs = orgs.filter(org => org.erpnext_link);
+
+                if (linkedOrgs.length === 0) {
                     targetOrgSelect.innerHTML =
-                        '<option value="" disabled>No organizations configured.</option>';
+                        '<option value="" disabled>No ERPNext-linked organizations configured.</option>';
                 } else {
-                    orgs.forEach((org) =>
+                    linkedOrgs.forEach((org) =>
                         targetOrgSelect.add(
                             new Option(
-                                `${org.instance_name} (${org.organization_id})`,
+                                org.name,
                                 org.id,
                             ),
                         ),
@@ -329,6 +333,7 @@
                 targetOrgSelect.innerHTML = `<option value="">Error loading organizations</option>`;
             }
         }
+        // --- END OF FIX ---
 
         function renderPreviewGrid() {
             new Handsontable(previewGridContainer, {

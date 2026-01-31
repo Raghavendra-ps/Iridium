@@ -19,13 +19,11 @@
             <label
                 for="organization_id"
                 style="display: block; margin-bottom: 8px; font-weight: 500"
-                >Organization ID</label
+                >1. Organization</label
             >
-            <input
-                type="text"
+            <select
                 id="organization_id"
                 name="organization_id"
-                placeholder="e.g., GIPL, PSIEC"
                 required
                 style="
                     width: 100%;
@@ -33,13 +31,15 @@
                     border: 1px solid var(--color-border);
                     border-radius: 8px;
                 "
-            />
+            >
+                <option value="">Loading organizations...</option>
+            </select>
         </div>
         <div class="form-group">
             <label
                 for="erpnext_url"
                 style="display: block; margin-bottom: 8px; font-weight: 500"
-                >ERPNext URL</label
+                >2. ERPNext URL</label
             >
             <input
                 type="url"
@@ -57,14 +57,14 @@
         </div>
         <div class="form-group">
             <label
-                for="api_key"
+                for="api_secret"
                 style="display: block; margin-bottom: 8px; font-weight: 500"
-                >API Key</label
+                >3. API Secret</label
             >
             <input
-                type="text"
-                id="api_key"
-                name="api_key"
+                type="password"
+                id="api_secret"
+                name="api_secret"
                 required
                 style="
                     width: 100%;
@@ -76,14 +76,14 @@
         </div>
         <div class="form-group">
             <label
-                for="api_secret"
+                for="api_key"
                 style="display: block; margin-bottom: 8px; font-weight: 500"
-                >API Secret</label
+                >4. API Key</label
             >
             <input
-                type="password"
-                id="api_secret"
-                name="api_secret"
+                type="text"
+                id="api_key"
+                name="api_key"
                 required
                 style="
                     width: 100%;
@@ -239,6 +239,7 @@
         const newLinkForm = document.getElementById("newLinkForm");
         const formStatus = document.getElementById("form-status");
         const submitButton = newLinkForm.querySelector('button[type="submit"]');
+        const orgSelect = document.getElementById("organization_id");
 
         const fetchAndRenderOrgs = async () => {
             try {
@@ -264,6 +265,23 @@
                     "</div>";
             } catch (error) {
                 orgsList.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+            }
+        };
+
+        const fetchExternalOrgs = async () => {
+            try {
+                // This is a public endpoint, so no auth header is needed.
+                const response = await fetch("https://gateway.gretis.com/api/v1/orgs");
+                if (!response.ok) throw new Error("Could not load external organization list.");
+                const externalOrgs = await response.json();
+                
+                orgSelect.innerHTML = '<option value="" disabled selected>-- Select an Organisation --</option>';
+                externalOrgs.forEach(org => {
+                    const option = new Option(`${org.name} (${org.organization_id})`, org.organization_id);
+                    orgSelect.add(option);
+                });
+            } catch (error) {
+                orgSelect.innerHTML = `<option value="">Error: ${error.message}</option>`;
             }
         };
 
@@ -314,6 +332,7 @@
             }
         };
         fetchAndRenderOrgs();
+        fetchExternalOrgs();
     }
 
     function initMappingProfiles(apiCall) {
@@ -445,7 +464,6 @@
             }
         };
 
-        // --- START OF FIX: Implemented Edit/Clone functionality ---
         window.editProfile = (profileId) => {
             const profile = allProfiles.find((p) => p.id === profileId);
             if (!profile) {
@@ -464,7 +482,6 @@
             window.scrollTo({ top: 0, behavior: "smooth" });
             profileNameInput.focus();
         };
-        // --- END OF FIX ---
 
         window.deleteProfile = async (profileId) => {
             if (

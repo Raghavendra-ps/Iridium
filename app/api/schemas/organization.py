@@ -15,8 +15,6 @@ class LinkedOrganizationCreate(LinkedOrganizationBase):
     # --- Add the secret only for creation ---
     api_secret: str
 
-    api_secret: str
-
 class LinkedOrganization(LinkedOrganizationBase):
     id: int
     instance_name: str

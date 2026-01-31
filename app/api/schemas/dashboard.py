@@ -26,10 +26,6 @@ class JobStatusCounts(BaseModel):
     processing: int
     other: int
 
-
-class DashboardStats(BaseModel):
-    """The main response model for the entire dashboard statistics endpoint."""
-
 class DashboardStats(BaseModel):
     """The main response model for the entire dashboard statistics endpoint."""
     jobs_today: int

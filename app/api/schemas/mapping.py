@@ -43,8 +43,6 @@ class MappingProfileCreate(MappingProfileBase):
 class MappingProfileUpdate(MappingProfileBase):
     mappings: List[AttendanceCodeMappingCreate]
 
-    mappings: List[AttendanceCodeMappingCreate]
-
 class MappingProfile(MappingProfileBase):
     id: int
     owner_id: int
