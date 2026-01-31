@@ -9,7 +9,8 @@ from sqlalchemy.orm import Session
 
 # This import remains the same, as all endpoint modules are needed.
 from app.api.endpoints import (admin, attendance, auth, conversions, dashboard, employees,
-                               mappings, organizations, pages, sheets, users)
+                               linked_organizations, mappings, organizations, pages, sheets,
+                               templates, users)
 from app.core.config import settings
 from app.db.models import User
 from app.db.session import get_db
@@ -68,12 +69,13 @@ app.include_router(users.router, prefix=f"{settings.API_V1_STR}/users", tags=["u
 app.include_router(admin.router, prefix=f"{settings.API_V1_STR}/admin", tags=["admin"])
 app.include_router(conversions.router, prefix=f"{settings.API_V1_STR}/conversions", tags=["conversions"])
 app.include_router(organizations.router, prefix=f"{settings.API_V1_STR}/organizations", tags=["organizations"])
-app.include_router(organizations.router, prefix=f"{settings.API_V1_STR}/linked-organizations", tags=["organizations"])
+app.include_router(linked_organizations.router, prefix=f"{settings.API_V1_STR}/linked-organizations", tags=["linked-organizations"])
 app.include_router(employees.router, prefix=f"{settings.API_V1_STR}/employees", tags=["employees"])
 app.include_router(dashboard.router, prefix=f"{settings.API_V1_STR}/dashboard", tags=["dashboard"])
 app.include_router(mappings.router, prefix=f"{settings.API_V1_STR}/mapping-profiles", tags=["mappings"])
 app.include_router(attendance.router, prefix=f"{settings.API_V1_STR}/attendance", tags=["attendance"])
 app.include_router(sheets.router, prefix=f"{settings.API_V1_STR}/sheets", tags=["sheets"])
+app.include_router(templates.router, prefix=f"{settings.API_V1_STR}/import-templates", tags=["templates"])
 app.include_router(pages.router, tags=["pages"])
 
 

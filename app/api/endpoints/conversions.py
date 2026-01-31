@@ -12,11 +12,10 @@ from sqlalchemy.orm import Session
 from app.api import dependencies
 from app.api.schemas import job as job_schemas
 from app.core.services import analysis_service, job_service
-from app.db.models import LinkedOrganization, User
+from app.db.models import ConversionJob, LinkedOrganization, User
 from app.db.session import get_db
 from app.infrastructure.celery_app import celery
 from app.infrastructure.erpnext_client import ERPNextClient
-from app.models.conversions import ConversionJob
 
 router = APIRouter()
 UPLOAD_DIR = Path("/app/uploads")

@@ -35,16 +35,22 @@ def create_employee(
 def list_employees(
     org_id: Optional[int] = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(dependencies.get_current_active_user)
+    current_user: User = Depends(dependencies.get_current_active_user),
 ):
-    # Use the org_id from the query param if provided (for sheet maker)
-    # otherwise use the user's own org
-    target_id = org_id if org_id else current_user.organization_id
-    
+    """
+    List employees for an organization. Internal orgs: from DB (editable).
+    External orgs: fetched from ERPNext (immutable). Superadmin can pass any org_id; manager only their org.
+    """
+    target_id = org_id if org_id is not None else current_user.organization_id
     if not target_id:
         return []
-        
-    return db.query(Employee).filter(Employee.organization_id == target_id).all()
+    if current_user.role != "superadmin" and target_id != current_user.organization_id:
+        return []
+    employees, is_external = employee_service.get_employees_for_org_any_source(db=db, org_id=target_id)
+    # Add is_external so frontend can make grid read-only for external orgs
+    for e in employees:
+        e["is_external"] = is_external
+    return employees
 
 @router.put("/{employee_id}", response_model=employee_schemas.Employee)
 def update_employee(
@@ -84,18 +90,24 @@ def delete_employee(
 
 @router.post("/sync/{org_id}", status_code=status.HTTP_200_OK)
 def sync_org_employees(
-    org_id: int, 
-    employees_in: List[EmployeeSync], 
+    org_id: int,
+    employees_in: List[EmployeeSync],
     db: Session = Depends(get_db),
-    current_user: User = Depends(dependencies.get_current_manager_user)
+    current_user: User = Depends(dependencies.get_current_manager_user),
 ):
     """
-    Bulk updates the employee roster for an organization.
-    Wipes existing list and replaces with the new grid data.
+    Bulk updates the employee roster for an organization (internal only).
+    External org employees are immutable; this endpoint returns 403 for external orgs.
     """
-    # Security: Only Superadmin can sync any org. Managers can only sync their own.
-    if current_user.role != 'superadmin' and current_user.organization_id != org_id:
+    if current_user.role != "superadmin" and current_user.organization_id != org_id:
         raise HTTPException(status_code=403, detail="Not authorized to manage this organization.")
+    from app.db.models import Organization
+    org = db.query(Organization).filter(Organization.id == org_id).first()
+    if org and (getattr(org, "source", "internal") or "internal") == "external":
+        raise HTTPException(
+            status_code=403,
+            detail="External organization employees are managed in ERPNext and cannot be edited here.",
+        )
 
     # 1. Clear existing roster
     db.query(Employee).filter(Employee.organization_id == org_id).delete()

@@ -4,13 +4,40 @@
 {% block content %}
 <div id="org-main-view">
     <div class="card">
-        <h1 class="card-title">Create New Organisation</h1>
+        <h1 class="card-title">Create New Organisation (Internal)</h1>
+        <p style="color: var(--color-text-muted); font-size: 0.9rem; margin-bottom: 1rem;">Internal organisations are managed here; you can edit employees in Employee Setup.</p>
         <form id="newOrgForm" style="display: flex; gap: 1rem; align-items: flex-end;">
             <div style="flex-grow: 1;">
                 <label style="display:block; margin-bottom:8px; font-weight:600; font-size:0.9rem;">Organisation Name</label>
                 <input type="text" id="org_name" required placeholder="e.g., Acme Corp" style="width:100%; padding:10px; border:1px solid var(--color-border); border-radius:8px;">
             </div>
             <button type="submit" class="btn" style="background:var(--color-accent); color:white; padding:11px 20px;">Create Organisation</button>
+        </form>
+    </div>
+
+    <div class="card">
+        <h1 class="card-title">Add External Company (ERPNext)</h1>
+        <p style="color: var(--color-text-muted); font-size: 0.9rem; margin-bottom: 1rem;">External companies are ERPNext instances; employee records are read-only and managed in ERPNext.</p>
+        <form id="newExternalOrgForm" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; align-items: flex-end;">
+            <div>
+                <label style="display:block; margin-bottom:8px; font-weight:600;">Display Name</label>
+                <input type="text" id="ext_org_name" required placeholder="e.g., Client ERPNext" style="width:100%; padding:10px; border:1px solid var(--color-border); border-radius:8px;">
+            </div>
+            <div>
+                <label style="display:block; margin-bottom:8px; font-weight:600;">ERPNext URL</label>
+                <input type="url" id="ext_erpnext_url" required placeholder="https://company.erpnext.com" style="width:100%; padding:10px; border:1px solid var(--color-border); border-radius:8px;">
+            </div>
+            <div>
+                <label style="display:block; margin-bottom:8px; font-weight:600;">API Key</label>
+                <input type="text" id="ext_api_key" required style="width:100%; padding:10px; border:1px solid var(--color-border); border-radius:8px;">
+            </div>
+            <div>
+                <label style="display:block; margin-bottom:8px; font-weight:600;">API Secret</label>
+                <input type="password" id="ext_api_secret" required style="width:100%; padding:10px; border:1px solid var(--color-border); border-radius:8px;">
+            </div>
+            <div style="grid-column: 2;">
+                <button type="submit" class="btn" style="background:var(--color-primary); color:white; padding:11px 20px;">Add External Company</button>
+            </div>
         </form>
     </div>
 
@@ -49,6 +76,7 @@
 <style>
     .org-card { border: 1px solid var(--color-border); border-radius: 12px; padding: 1.2rem; display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; background: white; }
     .org-info strong { font-size: 1.1rem; color: var(--color-primary); }
+    .org-source-badge { font-size: 0.8rem; color: var(--color-text-muted); font-weight: 500; margin-left: 6px; }
 </style>
 {% endblock %}
 
@@ -56,6 +84,7 @@
 <script>
 let hotEmployees;
 let currentOrgId = null;
+let currentOrgSource = 'internal';
 
 function onPageLoad(token, currentUser) {
     // Robust API Helper
@@ -80,25 +109,47 @@ function onPageLoad(token, currentUser) {
         if (!res.ok) return;
         const orgs = await res.json();
         const container = document.getElementById('orgs-list-container');
-        
-        if(orgs.length === 0) {
+
+        if (orgs.length === 0) {
             container.innerHTML = `<p style="color:var(--color-text-muted)">No organisations found.</p>`;
             return;
         }
 
-        container.innerHTML = orgs.map(org => `
+        container.innerHTML = orgs.map(org => {
+            const source = org.source || 'internal';
+            const label = source === 'external' ? ' (External)' : ' (Internal)';
+            const escapedName = (org.name || '').replace(/'/g, "\\'");
+            return `
             <div class="org-card">
                 <div class="org-info">
-                    <strong>${org.name}</strong>
+                    <strong>${org.name}</strong><span class="org-source-badge">${label}</span>
                     <p>Organisation ID: ${org.id}</p>
                 </div>
                 <div style="display:flex; gap:8px;">
-                    <button class="btn" style="border-color:var(--color-accent); color:var(--color-accent)" onclick="openEmployeeSetup(${org.id}, '${org.name}')">Employee Setup</button>
+                    <button class="btn" style="border-color:var(--color-accent); color:var(--color-accent)" onclick="openEmployeeSetup(${org.id}, '${escapedName}', '${source}')">Employee Setup</button>
                     <button class="btn btn-danger" onclick="deleteOrg(${org.id})">Delete</button>
                 </div>
             </div>
-        `).join('');
+        `}).join('');
     }
+
+    document.getElementById('newExternalOrgForm').onsubmit = async (e) => {
+        e.preventDefault();
+        const payload = {
+            name: document.getElementById('ext_org_name').value,
+            erpnext_url: document.getElementById('ext_erpnext_url').value,
+            api_key: document.getElementById('ext_api_key').value,
+            api_secret: document.getElementById('ext_api_secret').value
+        };
+        const res = await apiCall('/api/v1/organizations/external', { method: 'POST', body: JSON.stringify(payload) });
+        if (res.ok) {
+            document.getElementById('newExternalOrgForm').reset();
+            loadOrgs();
+        } else {
+            const err = await res.json();
+            alert(err.detail || 'Failed to add external company.');
+        }
+    };
 
     document.getElementById('newOrgForm').onsubmit = async (e) => {
         e.preventDefault();
@@ -113,41 +164,57 @@ function onPageLoad(token, currentUser) {
         }
     };
 
-    window.openEmployeeSetup = async (id, name) => {
+    window.openEmployeeSetup = async (id, name, source) => {
         currentOrgId = id;
+        currentOrgSource = source || 'internal';
         document.getElementById('org-main-view').style.display = 'none';
         document.getElementById('employee-setup-view').style.display = 'block';
-        document.getElementById('setup-subtitle').textContent = `Manage the roster for ${name}`;
-        
-        // --- FIX: Fetch existing employees using the correct query param ---
+        document.getElementById('setup-subtitle').textContent = currentOrgSource === 'external'
+            ? `${name} (External) — employees are read-only from ERPNext`
+            : `Manage the roster for ${name}`;
+
         const res = await apiCall(`/api/v1/employees/?org_id=${id}`);
         if (!res.ok) {
             alert("Failed to load employee list.");
             return;
         }
         const data = await res.json();
-        
-        // Format for grid
+        const isExternal = data.length > 0 && data[0].is_external === true;
+
+        if (isExternal) {
+            document.getElementById('saveEmployeesBtn').style.display = 'none';
+            document.getElementById('save-status').textContent = 'External organisation: employees are managed in ERPNext and cannot be edited here.';
+            document.getElementById('save-status').style.color = 'var(--color-text-muted)';
+        } else {
+            document.getElementById('saveEmployeesBtn').style.display = '';
+            document.getElementById('save-status').textContent = '';
+        }
+
         const tableData = data.map(e => [e.employee_code, e.employee_name, e.email || '']);
-        if(tableData.length === 0) tableData.push(['', '', '']); 
+        if (tableData.length === 0 && !isExternal) tableData.push(['', '', '']);
 
         const container = document.getElementById('employee-grid');
         container.innerHTML = '';
         hotEmployees = new Handsontable(container, {
             data: tableData,
             colHeaders: ['Employee Code', 'Full Name', 'Email (Required for Login)'],
-            columns: [{type:'text'}, {type:'text'}, {type:'text'}],
+            columns: [
+                { type: 'text', readOnly: isExternal },
+                { type: 'text', readOnly: isExternal },
+                { type: 'text', readOnly: isExternal }
+            ],
             rowHeaders: true,
-            minSpareRows: 1,
+            minSpareRows: isExternal ? 0 : 1,
             width: '100%',
             height: 450,
             licenseKey: 'non-commercial-and-evaluation',
-            contextMenu: true,
+            contextMenu: isExternal ? false : true,
             stretchH: 'all'
         });
     };
 
     document.getElementById('saveEmployeesBtn').onclick = async () => {
+        if (currentOrgSource === 'external') return;
         const btn = document.getElementById('saveEmployeesBtn');
         const status = document.getElementById('save-status');
         btn.disabled = true;
@@ -156,7 +223,7 @@ function onPageLoad(token, currentUser) {
 
         const rawData = hotEmployees.getData();
         const employees = rawData
-            .filter(row => row[0] && row[1]) // Only rows with code and name
+            .filter(row => row[0] && row[1])
             .map(row => ({ code: row[0].toString(), name: row[1].toString(), email: row[2] ? row[2].toString() : null }));
 
         try {
@@ -164,16 +231,17 @@ function onPageLoad(token, currentUser) {
                 method: 'POST',
                 body: JSON.stringify(employees)
             });
-            if(res.ok) {
+            if (res.ok) {
                 status.style.color = "#10b981";
                 status.textContent = "✓ Employee list updated!";
                 setTimeout(() => { status.textContent = ""; }, 3000);
             } else {
-                throw new Error("Save failed");
+                const err = await res.json();
+                throw new Error(err.detail || "Save failed");
             }
         } catch (e) {
             status.style.color = "#dc2626";
-            status.textContent = "Error saving changes.";
+            status.textContent = e.message || "Error saving changes.";
         } finally {
             btn.disabled = false;
         }

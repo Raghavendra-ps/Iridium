@@ -65,8 +65,6 @@ def delete_template(db: Session, *, owner_id: int, template_id: int) -> ImportTe
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Import template not found."
         )
-    if not db_template:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Import template not found.")
 
     db.delete(db_template)
     db.commit()

@@ -10,6 +10,7 @@ class Organization(Base):
     __tablename__ = "organizations"
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, unique=True, nullable=False)
+    source = Column(String, nullable=False, default="internal", server_default="internal")  # 'internal' | 'external'
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     users = relationship("User", back_populates="organization", cascade="all, delete-orphan")
     employees = relationship("Employee", back_populates="organization", cascade="all, delete-orphan")
@@ -28,6 +29,7 @@ class User(Base):
     organization = relationship("Organization", back_populates="users")
     jobs = relationship("ConversionJob", back_populates="owner", cascade="all, delete-orphan")
     mapping_profiles = relationship("MappingProfile", back_populates="owner", cascade="all, delete-orphan")
+    import_templates = relationship("ImportTemplate", back_populates="owner", cascade="all, delete-orphan")
 
 
 class Employee(Base):
@@ -51,6 +53,19 @@ class LinkedOrganization(Base):
     api_secret = Column(EncryptedString(255), nullable=False)
 
     organization = relationship("Organization", back_populates="erpnext_link")
+
+    @property
+    def instance_name(self) -> str:
+        """Display name for the linked instance (organization name or URL host)."""
+        if self.organization and self.organization.name:
+            return self.organization.name
+        if self.erpnext_url:
+            from urllib.parse import urlparse
+            try:
+                return urlparse(str(self.erpnext_url)).netloc or str(self.erpnext_url)
+            except Exception:
+                return str(self.erpnext_url)
+        return ""
 
 
 class ConversionJob(Base):
@@ -95,3 +110,13 @@ class AttendanceCodeMapping(Base):
     target_status = Column(String, nullable=False)
 
     profile = relationship("MappingProfile", back_populates="mappings")
+
+
+class ImportTemplate(Base):
+    __tablename__ = "import_templates"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)
+    config = Column(JSON, nullable=False)
+    owner_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+
+    owner = relationship("User", back_populates="import_templates")

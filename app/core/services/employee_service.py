@@ -1,13 +1,58 @@
-from typing import List, Optional
-from sqlalchemy.orm import Session
+import asyncio
+from typing import Any, Dict, List, Optional
+from sqlalchemy.orm import Session, joinedload
 from fastapi import HTTPException, status
 
-from app.db.models import Employee, Organization
+from app.db.models import Employee, LinkedOrganization, Organization
 from app.schemas.employee import EmployeeCreate, EmployeeUpdate
 
+
 def get_employees_by_org(db: Session, *, org_id: int) -> List[Employee]:
-    """Retrieves all employees for a specific organization."""
+    """Retrieves all employees for a specific organization (internal only)."""
     return db.query(Employee).filter(Employee.organization_id == org_id).order_by(Employee.employee_name).all()
+
+
+def get_employees_for_org_any_source(
+    db: Session, *, org_id: int
+) -> tuple[List[Dict[str, Any]], bool]:
+    """
+    Returns (list of { employee_code, employee_name }, is_external).
+    For internal orgs: from Employee table.
+    For external orgs: fetches from ERPNext via LinkedOrganization; employees are immutable.
+    """
+    org = db.query(Organization).filter(Organization.id == org_id).first()
+    if not org:
+        return [], False
+    source = getattr(org, "source", "internal") or "internal"
+    if source == "internal":
+        employees = get_employees_by_org(db, org_id=org_id)
+        return [
+            {"employee_code": e.employee_code, "employee_name": e.employee_name}
+            for e in employees
+        ], False
+    # External: fetch from ERPNext
+    link = (
+        db.query(LinkedOrganization)
+        .filter(LinkedOrganization.organization_id == org_id)
+        .first()
+    )
+    if not link:
+        return [], True
+    from app.infrastructure.erpnext_client import ERPNextClient
+    client = ERPNextClient(link.erpnext_url, link.api_key, link.api_secret)
+    try:
+        raw = asyncio.run(client.get_all_employees(force_refresh=True))
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Could not fetch employees from ERPNext: {str(e)}",
+        )
+    out = []
+    for row in raw:
+        code = row.get("employee_number") or row.get("name") or ""
+        name = row.get("employee_name") or str(code)
+        out.append({"employee_code": str(code), "employee_name": str(name)})
+    return out, True
 
 def create_employee(db: Session, *, org_id: int, employee_in: EmployeeCreate) -> Employee:
     """Creates a new manual employee record for an organization."""

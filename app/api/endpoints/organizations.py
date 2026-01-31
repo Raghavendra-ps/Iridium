@@ -6,6 +6,7 @@ from app.api import dependencies
 from app.db.models import User
 from app.db.session import get_db
 from app.schemas import organization as org_schemas
+from app.schemas.organization import OrganizationForDropdown
 from app.core.services import organization_service
 
 router = APIRouter()
@@ -32,6 +33,36 @@ def list_organizations(
     List all organizations in the system. (Superadmin only)
     """
     return organization_service.get_all_organizations(db=db)
+
+
+@router.get("/for-dropdown", response_model=List[OrganizationForDropdown])
+def list_organizations_for_dropdown(
+    *,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(dependencies.get_current_active_user),
+):
+    """
+    List organizations for sheet maker / dropdowns. Superadmin: all orgs. Manager: only their org.
+    Each item has id, name, source ('internal' | 'external').
+    """
+    return organization_service.get_organizations_for_dropdown(
+        db=db,
+        user_organization_id=current_user.organization_id,
+        is_superadmin=(current_user.role == "superadmin"),
+    )
+
+
+@router.post("/external", response_model=org_schemas.Organization, status_code=status.HTTP_201_CREATED)
+def create_external_organization(
+    *,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(dependencies.get_current_superadmin_user),
+    ext_in: org_schemas.ExternalOrganizationCreate,
+):
+    """
+    Create an external organization (ERPNext) and its link in one step. (Superadmin only)
+    """
+    return organization_service.create_external_organization(db=db, ext_in=ext_in)
 
 @router.post("/{org_id}/link-erpnext", response_model=org_schemas.Organization)
 def link_erpnext(

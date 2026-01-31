@@ -58,4 +58,3 @@ def delete_import_template(
     return template_service.delete_template(
         db=db, owner_id=current_user.id, template_id=template_id
     )
-    return template_service.delete_template(db=db, owner_id=current_user.id, template_id=template_id)

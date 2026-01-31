@@ -17,6 +17,7 @@
                     <option value="">-- Manual Entry --</option>
                 </select>
             </div>
+            <p id="org-hint" style="font-size:0.8rem; color:var(--color-text-muted); margin-top:4px; display:none;"></p>
             <div class="form-group">
                 <label style="display:block; margin-bottom:5px; font-weight:600; font-size:0.8rem;">2. Blank Rows</label>
                 <input type="number" id="num_rows" value="10" min="1" style="width:100%; padding:10px; border:1px solid var(--color-border); border-radius:8px;">
@@ -79,48 +80,72 @@ function onPageLoad(token, currentUser) {
     months.forEach((m, i) => monthSel.add(new Option(m, i+1)));
     monthSel.value = new Date().getMonth() + 1;
 
+    let orgsMeta = {}; // id -> { name, source }
+
     async function loadOrgs() {
-        const res = await apiCall('/api/v1/organizations/');
-        if(!res || !res.ok) return;
+        const res = await apiCall('/api/v1/organizations/for-dropdown');
+        if (!res || !res.ok) return;
         const orgs = await res.json();
         const select = document.getElementById('target_org_id');
-        orgs.forEach(o => select.add(new Option(o.name, o.id)));
+        select.innerHTML = '<option value="">-- Manual Entry --</option>';
+        orgs.forEach(o => {
+            const label = o.source === 'external' ? `${o.name} (External)` : `${o.name} (Internal)`;
+            select.add(new Option(label, o.id));
+            orgsMeta[o.id] = { name: o.name, source: o.source };
+        });
     }
+
+    document.getElementById('target_org_id').addEventListener('change', () => {
+        const orgId = document.getElementById('target_org_id').value;
+        const hint = document.getElementById('org-hint');
+        if (!orgId) { hint.style.display = 'none'; return; }
+        const meta = orgsMeta[orgId];
+        if (meta) {
+            hint.style.display = 'block';
+            hint.textContent = meta.source === 'external'
+                ? 'Employees are loaded from ERPNext and cannot be edited.'
+                : 'Employees can be edited in Organisations → Employee Setup.';
+        }
+    });
 
     document.getElementById('generateBtn').onclick = async () => {
         const orgId = document.getElementById('target_org_id').value;
         const rowCount = document.getElementById('num_rows').value;
-        
+
         let initialData = [];
+        const meta = orgId ? orgsMeta[orgId] : null;
+        const isExternal = meta && meta.source === 'external';
         if (orgId) {
             const res = await apiCall(`/api/v1/employees/?org_id=${orgId}`);
             if (res.ok) {
                 const employees = await res.json();
-                // --- FIX: Check if we actually got an array ---
                 if (Array.isArray(employees)) {
                     initialData = employees.map(e => [e.employee_code, e.employee_name]);
                 }
             }
-        } 
-        
-        if (initialData.length === 0) {
-            for(let i=0; i<rowCount; i++) initialData.push(['', '']);
         }
 
-        renderGrid(initialData);
+        if (initialData.length === 0) {
+            for (let i = 0; i < rowCount; i++) initialData.push(['', '']);
+        }
+
+        renderGrid(initialData, isExternal);
         document.getElementById('grid-card').style.display = 'block';
     };
 
-    function renderGrid(baseData) {
+    function renderGrid(baseData, isExternal) {
         const y = parseInt(yearSel.value);
         const m = parseInt(monthSel.value);
         const days = new Date(y, m, 0).getDate();
         const colHeaders = ['Emp Code', 'Emp Name'];
-        const columns = [{width: 90}, {width: 180}];
-        
-        for(let d=1; d<=days; d++) {
+        const columns = [
+            { width: 90, readOnly: !!isExternal },
+            { width: 180, readOnly: !!isExternal }
+        ];
+
+        for (let d = 1; d <= days; d++) {
             colHeaders.push(d.toString());
-            columns.push({width: 35, type: 'dropdown', source: ['', 'P', 'A', 'L', 'HD']});
+            columns.push({ width: 35, type: 'dropdown', source: ['', 'P', 'A', 'L', 'HD'] });
         }
 
         const container = document.getElementById('attendance-grid');

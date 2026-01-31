@@ -212,10 +212,9 @@
                     "Content-Type": "application/json",
                 },
             };
-            const response = await fetch(url, {
-                ...defaultOptions,
-                ...options,
-            });
+            const merged = { ...defaultOptions, ...options };
+            merged.headers = { ...defaultOptions.headers, ...(options.headers || {}) };
+            const response = await fetch(url, merged);
             if (response.status === 401) {
                 window.location.href = "/login";
                 throw new Error("Unauthorized");
@@ -223,8 +222,19 @@
             return response;
         };
 
-        initOrganizations(apiCall);
-        initMappingProfiles(apiCall);
+        function errorMessage(err) {
+            if (typeof err === "string") return err;
+            if (err && err.detail) {
+                if (typeof err.detail === "string") return err.detail;
+                if (Array.isArray(err.detail)) return err.detail.map((e) => e.msg || JSON.stringify(e)).join("; ");
+                return JSON.stringify(err.detail);
+            }
+            if (err && typeof err.message === "string" && err.message !== "[object Object]") return err.message;
+            return "An error occurred";
+        }
+
+        initOrganizations(apiCall, errorMessage);
+        initMappingProfiles(apiCall, errorMessage);
 
         const style = document.createElement("style");
         style.textContent = `
@@ -234,7 +244,7 @@
         document.head.appendChild(style);
     }
 
-    function initOrganizations(apiCall) {
+    function initOrganizations(apiCall, errorMessage) {
         const orgsList = document.getElementById("orgs-list");
         const newLinkForm = document.getElementById("newLinkForm");
         const formStatus = document.getElementById("form-status");
@@ -244,8 +254,10 @@
         const fetchAndRenderOrgs = async () => {
             try {
                 const response = await apiCall("/api/v1/linked-organizations/");
-                if (!response.ok)
-                    throw new Error("Failed to fetch organizations");
+                if (!response.ok) {
+                    const errBody = await response.json().catch(() => ({}));
+                    throw Object.assign(new Error(errBody.detail || "Failed to fetch organizations"), { detail: errBody.detail });
+                }
                 const orgs = await response.json();
                 if (orgs.length === 0) {
                     orgsList.innerHTML = `<p style="color: var(--color-text-muted);">No organizations have been linked yet.</p>`;
@@ -264,7 +276,7 @@
                         .join("") +
                     "</div>";
             } catch (error) {
-                orgsList.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+                orgsList.innerHTML = `<p style="color: red;">Error: ${errorMessage(error)}</p>`;
             }
         };
 
@@ -296,10 +308,9 @@
                     { method: "POST", body: JSON.stringify(data) },
                 );
                 if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(
-                        errorData.detail || `HTTP Error ${response.status}`,
-                    );
+                    const errorData = await response.json().catch(() => ({}));
+                    const msg = (errorData && (typeof errorData.detail === "string" ? errorData.detail : JSON.stringify(errorData.detail))) || `HTTP Error ${response.status}`;
+                    throw new Error(msg);
                 }
                 newLinkForm.reset();
                 formStatus.textContent = "Successfully linked!";
@@ -307,7 +318,7 @@
                 fetchAndRenderOrgs();
                 setTimeout(() => (formStatus.textContent = ""), 4000);
             } catch (error) {
-                formStatus.innerHTML = `<span style="color: red;">Error: ${error.message}</span>`;
+                formStatus.innerHTML = `<span style="color: red;">Error: ${errorMessage(error)}</span>`;
             } finally {
                 submitButton.disabled = false;
             }
@@ -335,7 +346,7 @@
         fetchExternalOrgs();
     }
 
-    function initMappingProfiles(apiCall) {
+    function initMappingProfiles(apiCall, errorMessage) {
         const newProfileForm = document.getElementById("newMappingProfileForm");
         const profileNameInput = document.getElementById("profile_name");
         const rowsContainer = document.getElementById("mapping-rows-container");
@@ -460,7 +471,7 @@
                 allProfiles = await response.json(); // Cache the profiles
                 renderProfiles(allProfiles);
             } catch (error) {
-                profilesList.innerHTML = `<p style="color: red;">${error.message}</p>`;
+                profilesList.innerHTML = `<p style="color: red;">${errorMessage(error)}</p>`;
             }
         };
 
