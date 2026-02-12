@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -12,21 +13,91 @@
     <link rel="shortcut icon" href="/static/favicon.ico">
 
     <style>
-        body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #f4f1eb; }
-        .login-container { background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); width: 320px; text-align: center; }
-        .logo { height: 40px; margin-bottom: 1.5rem; }
-        .form-group { margin-bottom: 1rem; text-align: left; }
-        label { display: block; margin-bottom: 0.5rem; color: #555; }
-        input { width: 100%; padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
-        button { width: 100%; padding: 0.75rem; border: none; border-radius: 4px; background-color: #007bff; color: white; font-size: 1rem; cursor: pointer; }
-        button:hover { background-color: #0056b3; }
-        .status { margin-top: 1rem; text-align: center; font-size: 0.9rem; }
-        .error { color: red; }
-        .success { color: green; }
-        .register-link { text-align: center; margin-top: 1.5rem; font-size: 0.9rem; color: #555; }
-        .register-link a { color: #007bff; text-decoration: none; }
+        body {
+            font-family: sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #f4f1eb;
+        }
+
+        .login-container {
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            width: 320px;
+            text-align: center;
+        }
+
+        .logo {
+            height: 100px;
+            margin-bottom: 1.5rem;
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+            text-align: left;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #555;
+        }
+
+        input {
+            width: 100%;
+            padding: 0.5rem;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+
+        button {
+            width: 100%;
+            padding: 0.75rem;
+            border: none;
+            border-radius: 4px;
+            background-color: #007bff;
+            color: white;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        .status {
+            margin-top: 1rem;
+            text-align: center;
+            font-size: 0.9rem;
+        }
+
+        .error {
+            color: red;
+        }
+
+        .success {
+            color: green;
+        }
+
+        .register-link {
+            text-align: center;
+            margin-top: 1.5rem;
+            font-size: 0.9rem;
+            color: #555;
+        }
+
+        .register-link a {
+            color: #007bff;
+            text-decoration: none;
+        }
     </style>
 </head>
+
 <body>
     <div class="login-container">
         <img src="/static/images/logo.svg" alt="Gretis Logo" class="logo">
@@ -64,7 +135,7 @@
             }
         });
 
-        document.getElementById('loginForm').addEventListener('submit', async function(event) {
+        document.getElementById('loginForm').addEventListener('submit', async function (event) {
             event.preventDefault();
             const form = event.target;
             const statusMessage = document.getElementById('status-message');
@@ -96,4 +167,5 @@
         });
     </script>
 </body>
+
 </html>
