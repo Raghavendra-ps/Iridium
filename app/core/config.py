@@ -13,6 +13,19 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api/v1"
     SECRET_KEY: str
 
+    # --- SMTP Email Settings ---
+    SMTP_HOST: str = "smtp.gmail.com"
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    parsed_smtp_port: Optional[int] = None
+
+    @property
+    def MAIL_PORT(self) -> int:
+        return self.parsed_smtp_port or self.SMTP_PORT
+
+
+
     # --- Database Settings ---
     POSTGRES_SERVER: str
     POSTGRES_USER: str

@@ -1,4 +1,4 @@
-{% extends "dashboard_base.html" %} {% block title %}Configure Job #{{ job_id
+{% extends base_template %} {% block title %}Configure Job #{{ job_id
 }}{% endblock %} {% block content %}
 <div id="configure-page-container" data-job-id="{{ job_id }}">
     <div class="card">
@@ -10,13 +10,11 @@
 
         <!-- Configuration Form -->
         <form id="configForm">
-            <div
-                style="
+            <div style="
                     display: grid;
                     grid-template-columns: 1fr 1.5fr;
                     gap: 2rem;
-                "
-            >
+                ">
                 <!-- Left Column: Settings -->
                 <div>
                     <h2 class="form-section-title">Parsing Logic</h2>
@@ -39,11 +37,7 @@
                     </h2>
                     <div class="form-group">
                         <label for="target_org_id">Target Organization</label>
-                        <select
-                            id="target_org_id"
-                            name="target_org_id"
-                            required
-                        >
+                        <select id="target_org_id" name="target_org_id" required>
                             <option value="">Loading organizations...</option>
                         </select>
                     </div>
@@ -54,21 +48,17 @@
                     <h2 class="form-section-title">
                         File Preview (First 5 Rows)
                     </h2>
-                    <div
-                        id="data-preview-grid"
-                        style="
+                    <div id="data-preview-grid" style="
                             width: 100%;
                             height: 300px;
                             overflow: hidden;
                             border: 1px solid var(--color-border);
-                        "
-                    ></div>
+                        "></div>
                 </div>
             </div>
 
             <!-- Actions -->
-            <div
-                style="
+            <div style="
                     display: flex;
                     justify-content: flex-end;
                     align-items: center;
@@ -76,22 +66,14 @@
                     margin-top: 2rem;
                     border-top: 1px solid var(--color-border);
                     padding-top: 1.5rem;
-                "
-            >
-                <div
-                    id="statusMessage"
-                    style="font-size: 0.9rem; flex-grow: 1; color: red"
-                ></div>
-                <button
-                    type="submit"
-                    class="btn"
-                    style="
+                ">
+                <div id="statusMessage" style="font-size: 0.9rem; flex-grow: 1; color: red"></div>
+                <button type="submit" class="btn" style="
                         background-color: var(--color-accent);
                         color: white;
                         font-size: 1rem;
                         padding: 12px 24px;
-                    "
-                >
+                    ">
                     Confirm and Process File
                 </button>
             </div>
@@ -107,15 +89,18 @@
         padding-bottom: 0.5rem;
         border-bottom: 1px solid var(--color-border);
     }
+
     .form-group {
         margin-bottom: 1.5rem;
     }
+
     .form-group label {
         display: block;
         margin-bottom: 8px;
         font-weight: 500;
         color: var(--color-text);
     }
+
     .form-group select,
     .form-group input {
         width: 100%;
@@ -125,6 +110,7 @@
         background-color: white;
         font-size: 1rem;
     }
+
     .help-text {
         font-size: 0.85rem;
         color: var(--color-text-muted);
@@ -254,7 +240,7 @@
             // Leave header_rows blank for auto-detection by default
             document.getElementById("config-header_rows").value =
                 suggestions.header_row !== undefined &&
-                suggestions.header_row !== null
+                    suggestions.header_row !== null
                     ? suggestions.header_row
                     : "";
 
@@ -303,18 +289,20 @@
                 select.innerHTML = `<option value="">Error loading</option>`;
             }
         }
-        
+
         // --- START OF FIX: Corrected API endpoint and data handling ---
         async function loadOrganizations() {
             try {
-                const response = await apiCall("/api/v1/organizations/");
+                // Use the dropdown endpoint which is accessible to all active users
+                const response = await apiCall("/api/v1/organizations/for-dropdown");
                 if (!response.ok)
                     throw new Error("Failed to fetch organizations");
                 const orgs = await response.json();
                 targetOrgSelect.innerHTML =
                     '<option value="" disabled selected>-- Select a Target --</option>';
-                
-                const linkedOrgs = orgs.filter(org => org.erpnext_link);
+
+                // Show any organization that is linked to ERPNext (can receive data)
+                const linkedOrgs = orgs.filter(org => org.is_linked);
 
                 if (linkedOrgs.length === 0) {
                     targetOrgSelect.innerHTML =
@@ -323,13 +311,14 @@
                     linkedOrgs.forEach((org) =>
                         targetOrgSelect.add(
                             new Option(
-                                org.name,
+                                `${org.name} (${org.source})`,
                                 org.id,
                             ),
                         ),
                     );
                 }
             } catch (error) {
+                console.error("Error loading organizations:", error);
                 targetOrgSelect.innerHTML = `<option value="">Error loading organizations</option>`;
             }
         }

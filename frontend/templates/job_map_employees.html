@@ -1,60 +1,44 @@
-{% extends "dashboard_base.html" %} {% block title %}Map Employees - Job #{{
+{% extends base_template %} {% block title %}Map Employees - Job #{{
 job_id }}{% endblock %} {% block content %}
-<div
-    class="container"
-    style="
+<div class="container" style="
         max-width: 1400px;
         margin: 0 auto;
         padding: 20px;
         height: calc(100vh - 80px);
         display: flex;
         flex-direction: column;
-    "
-    data-job-id="{{ job_id }}"
->
+    " data-job-id="{{ job_id }}">
     <!-- Header -->
     <div class="card" style="margin-bottom: 20px; flex-shrink: 0">
-        <div
-            style="
+        <div style="
                 display: flex;
                 justify-content: space-between;
                 align-items: center;
-            "
-        >
+            ">
             <div>
                 <h1 class="card-title">Step 3: Map Employee Codes</h1>
-                <p
-                    style="
+                <p style="
                         color: var(--color-text-muted);
                         margin-bottom: 0;
                         font-size: 0.95rem;
-                    "
-                >
+                    ">
                     Match your company employee codes with ERPNext employee IDs.
                     Unmapped employees will be skipped.
                 </p>
             </div>
             <div style="display: flex; gap: 10px">
-                <button
-                    id="auto-map-btn"
-                    class="btn"
-                    style="
+                <button id="auto-map-btn" class="btn" style="
                         background-color: #6366f1;
                         color: white;
                         padding: 10px 20px;
-                    "
-                >
+                    ">
                     Auto-Map Matches
                 </button>
-                <button
-                    id="clear-all-btn"
-                    class="btn"
-                    style="
+                <button id="clear-all-btn" class="btn" style="
                         background-color: #ef4444;
                         color: white;
                         padding: 10px 20px;
-                    "
-                >
+                    ">
                     Clear All
                 </button>
             </div>
@@ -62,18 +46,14 @@ job_id }}{% endblock %} {% block content %}
     </div>
 
     <!-- Loading State -->
-    <div
-        id="loading"
-        class="card"
-        style="
+    <div id="loading" class="card" style="
             text-align: center;
             padding: 60px;
             flex: 1;
             display: flex;
             align-items: center;
             justify-content: center;
-        "
-    >
+        ">
         <div style="display: inline-block">
             <div class="spinner"></div>
             <p style="margin-top: 20px; color: #666">
@@ -83,49 +63,33 @@ job_id }}{% endblock %} {% block content %}
     </div>
 
     <!-- Mapping Interface -->
-    <div
-        id="mapping-interface"
-        class="card"
-        style="display: none; flex: 1; flex-direction: column; min-height: 0"
-    >
+    <div id="mapping-interface" class="card" style="display: none; flex: 1; flex-direction: column; min-height: 0">
         <!-- Search and Filter Bar -->
-        <div
-            style="
+        <div style="
                 margin-bottom: 20px;
                 display: flex;
                 gap: 10px;
                 align-items: center;
                 flex-shrink: 0;
-            "
-        >
-            <input
-                type="search"
-                id="search-mapping"
-                placeholder="Search employee codes or names..."
-                style="
+            ">
+            <input type="search" id="search-mapping" placeholder="Search employee codes or names..." style="
                     flex: 1;
                     padding: 10px 15px;
                     border: 1px solid #ddd;
                     border-radius: 6px;
                     font-size: 14px;
-                "
-            />
+                " />
         </div>
 
         <!-- Stats Info -->
-        <div
-            style="
+        <div style="
                 margin-bottom: 15px;
                 display: flex;
                 justify-content: space-between;
                 align-items: center;
                 flex-shrink: 0;
-            "
-        >
-            <div
-                id="mapping-stats"
-                style="font-size: 16px; font-weight: 600; color: #374151"
-            ></div>
+            ">
+            <div id="mapping-stats" style="font-size: 16px; font-weight: 600; color: #374151"></div>
             <div style="font-size: 14px; color: #6b7280">
                 💡 Tip: Unmapped employees will be skipped and can be processed
                 later
@@ -133,8 +97,7 @@ job_id }}{% endblock %} {% block content %}
         </div>
 
         <!-- Mapping Grid Header -->
-        <div
-            style="
+        <div style="
                 display: grid;
                 grid-template-columns: 1fr 1fr;
                 gap: 20px;
@@ -144,88 +107,62 @@ job_id }}{% endblock %} {% block content %}
                 font-weight: 600;
                 color: #374151;
                 flex-shrink: 0;
-            "
-        >
+            ">
             <div>Company Employee</div>
             <div>ERPNext Employee</div>
         </div>
 
         <!-- Mapping List -->
-        <div
-            id="mapping-list"
-            style="flex: 1; overflow-y: auto; border-bottom: 1px solid #e5e7eb"
-        ></div>
+        <div id="mapping-list" style="flex: 1; overflow-y: auto; border-bottom: 1px solid #e5e7eb"></div>
 
         <!-- Actions Bar -->
-        <div
-            style="
+        <div style="
                 margin-top: 20px;
                 display: flex;
                 justify-content: space-between;
                 align-items: center;
                 flex-shrink: 0;
-            "
-        >
+            ">
             <div>
                 <div style="font-size: 14px; color: #6b7280">
-                    <span
-                        id="ready-count"
-                        style="font-weight: 600; color: #059669"
-                        >0</span
-                    >
+                    <span id="ready-count" style="font-weight: 600; color: #059669">0</span>
                     ready to submit
                     <span style="margin: 0 8px">•</span>
-                    <span
-                        id="skip-count"
-                        style="font-weight: 600; color: #f59e0b"
-                        >0</span
-                    >
+                    <span id="skip-count" style="font-weight: 600; color: #f59e0b">0</span>
                     will be skipped
                 </div>
             </div>
-            <button
-                id="submit-btn"
-                class="btn"
-                style="
+            <button id="submit-btn" class="btn" style="
                     background-color: var(--color-accent);
                     color: white;
                     padding: 14px 30px;
                     font-size: 16px;
                     font-weight: 600;
-                "
-            >
+                ">
                 Submit to ERPNext
             </button>
         </div>
     </div>
 
     <!-- Error State -->
-    <div
-        id="error-panel"
-        class="card"
-        style="
+    <div id="error-panel" class="card" style="
             display: none;
             background-color: #fff1f2;
             border-color: #fca5a5;
             flex: 1;
             justify-content: center;
             align-items: center;
-        "
-    >
+        ">
         <div style="text-align: center; max-width: 600px">
             <h3 style="color: #b91c1c; margin-bottom: 10px">
                 ⚠️ Error Loading Data
             </h3>
             <p id="error-message" style="color: #991b1b"></p>
-            <button
-                onclick="window.location.reload()"
-                class="btn"
-                style="
+            <button onclick="window.location.reload()" class="btn" style="
                     margin-top: 15px;
                     background-color: #6366f1;
                     color: white;
-                "
-            >
+                ">
                 Retry
             </button>
         </div>
@@ -246,6 +183,7 @@ job_id }}{% endblock %} {% block content %}
         0% {
             transform: rotate(0deg);
         }
+
         100% {
             transform: rotate(360deg);
         }
@@ -475,13 +413,13 @@ job_id }}{% endblock %} {% block content %}
                         <select class="employee-select" data-company-code="${sanitizedCode}">
                             <option value="">-- Select ERPNext Employee (or skip) --</option>
                             ${erpnextEmployees
-                                .map((erpEmp) => {
-                                    const displayText = erpEmp.employee_number
-                                        ? `${erpEmp.name} - ${erpEmp.employee_name} [${erpEmp.employee_number}]`
-                                        : `${erpEmp.name} - ${erpEmp.employee_name}`;
-                                    return `<option value="${erpEmp.name}">${displayText}</option>`;
-                                })
-                                .join("")}
+                            .map((erpEmp) => {
+                                const displayText = erpEmp.employee_number
+                                    ? `${erpEmp.name} - ${erpEmp.employee_name} [${erpEmp.employee_number}]`
+                                    : `${erpEmp.name} - ${erpEmp.employee_name}`;
+                                return `<option value="${erpEmp.name}">${displayText}</option>`;
+                            })
+                            .join("")}
                         </select>
                     </div>
                 </div>
@@ -665,7 +603,7 @@ job_id }}{% endblock %} {% block content %}
                             (e) =>
                                 e.employee_number &&
                                 e.employee_number.substring(0, 4) ===
-                                    compCode.substring(0, 4),
+                                compCode.substring(0, 4),
                         )
                         .slice(0, 3);
 

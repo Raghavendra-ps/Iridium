@@ -160,6 +160,10 @@
                 <label>Password</label>
                 <input type="password" id="password" required minlength="8" placeholder="••••••••">
             </div>
+            <div class="form-group">
+                <label>Confirm Password</label>
+                <input type="password" id="confirm_password" required minlength="8" placeholder="••••••••">
+            </div>
 
             <div class="form-group">
                 <label>Organisation</label>
@@ -236,9 +240,17 @@
             const statusMessage = document.getElementById('status-message');
             statusMessage.textContent = "";
 
+            const password = document.getElementById('password').value;
+            const confirmPassword = document.getElementById('confirm_password').value;
+
+            if (password !== confirmPassword) {
+                statusMessage.textContent = "Passwords do not match.";
+                return;
+            }
+
             const payload = {
                 email: document.getElementById('email').value,
-                password: document.getElementById('password').value,
+                password: password,
                 organization_id: selectedOrgIdInput.value === "NEW" ? null : (selectedOrgIdInput.value ? parseInt(selectedOrgIdInput.value) : null),
                 organization_name: selectedOrgIdInput.value === "NEW" ? newOrgNameInput.value : null
             };
@@ -256,7 +268,8 @@
                 });
 
                 if (res.ok) {
-                    window.location.href = '/login?registered=true';
+                    const emailParam = encodeURIComponent(payload.email);
+                    window.location.href = `/verify-email?email=${emailParam}`;
                 } else {
                     const err = await res.json();
                     statusMessage.textContent = err.detail || "Registration failed.";
@@ -264,6 +277,7 @@
             } catch (error) {
                 statusMessage.textContent = "Server error. Please try again later.";
             }
+
         });
 
         loadOrgs();

@@ -4,6 +4,9 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>{% block title %}Dashboard{% endblock %}</title>
 
     <!-- Favicons -->
@@ -15,6 +18,7 @@
     <!-- Fonts & Third-Party -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/handsontable/dist/handsontable.full.min.css" />
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     <script src="https://cdn.jsdelivr.net/npm/handsontable/dist/handsontable.full.min.js"></script>
 
     <style>
@@ -204,6 +208,7 @@
             <aside class="sidebar">
                 <nav>
                     <ul class="nav-list" id="sidebar-nav">
+
                         <!-- Home is visible to all -->
                         <li id="home-nav-link" style="display: none;"><a href="/home"
                                 class="{% if active_page == 'home' %}active{% endif %}">Dashboard</a></li>
@@ -211,8 +216,9 @@
                         <!-- Operations -->
                         <li id="upload-nav-link" style="display: none;"><a href="/upload"
                                 class="{% if active_page == 'upload' %}active{% endif %}">New Conversion</a></li>
-                        <li id="sheet-maker-nav-link" style="display: none;"><a href="/sheet-maker"
-                                class="{% if active_page == 'sheet-maker' %}active{% endif %}">Attendance</a></li>
+                        <li id="sheet-maker-nav-link" style="display: none;"><a href="/attendance-creation"
+                                class="{% if active_page == 'attendance-creation' %}active{% endif %}">Attendance</a>
+                        </li>
 
                         <!-- Employee Specific -->
                         <li id="attendance-nav-link" style="display: none;"><a href="/check-attendance"
@@ -228,8 +234,9 @@
                     </ul>
                 </nav>
             </aside>
-            <main class="main-content">
+            <main class="main-content" id="main-content">
                 {% block content %}{% endblock %}
+                {% block scripts %}{% endblock %}
             </main>
         </div>
     </div>
@@ -246,17 +253,24 @@
 
             try {
                 // LIVE PERMISSION CHECK: Fetch fresh data from backend on every page load
-                const userResponse = await fetch("/api/v1/users/me", {
-                    headers: { Authorization: `Bearer ${token}` },
+                // Add timestamp to force cache bypass
+                const timestamp = new Date().getTime();
+                const response = await fetch(`/api/v1/users/me?_t=${timestamp}`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Cache-Control': 'no-cache, no-store, must-revalidate',
+                        'Pragma': 'no-cache'
+                    },
+                    cache: 'no-store'
                 });
 
-                if (!userResponse.ok) {
+                if (!response.ok) {
                     localStorage.removeItem("access_token");
                     window.location.href = "/login";
                     return;
                 }
 
-                currentUser = await userResponse.json();
+                currentUser = await response.json();
 
                 // Update Top Bar
                 document.getElementById("user-email").textContent = currentUser.email;
@@ -307,9 +321,22 @@
                 window.location.href = "/login";
             });
         });
+
+        // --- HTMX Sidebar Active State Logic ---
+        document.body.addEventListener('htmx:afterOnLoad', function (evt) {
+            // update sidebar active state based on the new URL
+            const path = window.location.pathname;
+            document.querySelectorAll('.nav-list a').forEach(a => {
+                if (a.getAttribute('href') === path) {
+                    a.classList.add('active');
+                } else {
+                    a.classList.remove('active');
+                }
+            });
+        });
     </script>
 
-    {% block scripts %}{% endblock %}
+
 </body>
 
 </html>

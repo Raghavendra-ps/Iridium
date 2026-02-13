@@ -13,7 +13,8 @@ WORKDIR /app
 COPY pyproject.toml poetry.lock ./
 
 # --- FIX: Update lock file inside the build to match pyproject.toml ---
-RUN poetry lock --no-update
+# Lock file should be updated locally
+
 RUN poetry install --no-interaction --no-ansi
 
 # Stage 2: Production image

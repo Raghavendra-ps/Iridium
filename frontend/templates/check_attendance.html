@@ -1,4 +1,4 @@
-{% extends "dashboard_base.html" %}
+{% extends base_template %}
 
 {% block title %}My Attendance{% endblock %}
 
@@ -9,7 +9,8 @@
             <h1 class="card-title">Personal Attendance History</h1>
             <p id="emp-meta" style="color: var(--color-text-muted); font-size: 0.9rem;">Verifying links...</p>
         </div>
-        <div id="sync-status" class="user-tag" style="background: #dcfce7; color: #166534; display: none;">Account Linked</div>
+        <div id="sync-status" class="user-tag" style="background: #dcfce7; color: #166534; display: none;">Account
+            Linked</div>
     </div>
 </div>
 
@@ -21,62 +22,134 @@
 </div>
 
 <style>
-    .month-card { background: white; border: 1px solid var(--color-border); border-radius: 12px; margin-bottom: 1rem; overflow: hidden; box-shadow: var(--shadow-sm); }
-    .month-header { padding: 1.25rem; background: #fff; cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: background 0.2s; }
-    .month-header:hover { background: #f8fafc; }
-    .month-title { font-weight: 700; color: var(--color-primary); font-size: 1.1rem; }
-    .month-body { padding: 1.5rem; display: none; border-top: 1px solid var(--color-border); background: #fdfdfd; }
-    
-    .attendance-grid-mini { display: grid; grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); gap: 10px; }
-    .day-box { padding: 10px 5px; border-radius: 8px; text-align: center; border: 1px solid #e2e8f0; background: white; }
-    .day-num { font-size: 0.7rem; color: var(--color-text-muted); display: block; margin-bottom: 4px; font-weight: 600; }
-    .day-status { font-size: 0.8rem; font-weight: 700; }
+    .month-card {
+        background: white;
+        border: 1px solid var(--color-border);
+        border-radius: 12px;
+        margin-bottom: 1rem;
+        overflow: hidden;
+        box-shadow: var(--shadow-sm);
+    }
+
+    .month-header {
+        padding: 1.25rem;
+        background: #fff;
+        cursor: pointer;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        transition: background 0.2s;
+    }
+
+    .month-header:hover {
+        background: #f8fafc;
+    }
+
+    .month-title {
+        font-weight: 700;
+        color: var(--color-primary);
+        font-size: 1.1rem;
+    }
+
+    .month-body {
+        padding: 1.5rem;
+        display: none;
+        border-top: 1px solid var(--color-border);
+        background: #fdfdfd;
+    }
+
+    .attendance-grid-mini {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+        gap: 10px;
+    }
+
+    .day-box {
+        padding: 10px 5px;
+        border-radius: 8px;
+        text-align: center;
+        border: 1px solid #e2e8f0;
+        background: white;
+    }
+
+    .day-num {
+        font-size: 0.7rem;
+        color: var(--color-text-muted);
+        display: block;
+        margin-bottom: 4px;
+        font-weight: 600;
+    }
+
+    .day-status {
+        font-size: 0.8rem;
+        font-weight: 700;
+    }
 
     /* Modern Status Colors */
-    .status-Present { background: #f0fdf4; border-color: #bbf7d0; color: #166534; }
-    .status-Absent { background: #fef2f2; border-color: #fecaca; color: #991b1b; }
-    .status-Leave, .status-On_Leave { background: #eff6ff; border-color: #dbeafe; color: #1e40af; }
-    .status-Half_Day { background: #fffbeb; border-color: #fef3c7; color: #92400e; }
+    .status-Present {
+        background: #f0fdf4;
+        border-color: #bbf7d0;
+        color: #166534;
+    }
+
+    .status-Absent {
+        background: #fef2f2;
+        border-color: #fecaca;
+        color: #991b1b;
+    }
+
+    .status-Leave,
+    .status-On_Leave {
+        background: #eff6ff;
+        border-color: #dbeafe;
+        color: #1e40af;
+    }
+
+    .status-Half_Day {
+        background: #fffbeb;
+        border-color: #fef3c7;
+        color: #92400e;
+    }
 </style>
 {% endblock %}
 
 {% block scripts %}
 <script>
-function onPageLoad(token) {
-    const container = document.getElementById('attendance-container');
-    const meta = document.getElementById('emp-meta');
-    const syncBadge = document.getElementById('sync-status');
+    function onPageLoad(token) {
+        const container = document.getElementById('attendance-container');
+        const meta = document.getElementById('emp-meta');
+        const syncBadge = document.getElementById('sync-status');
 
-    async function fetchAttendance() {
-        try {
-            const res = await fetch('/api/v1/attendance/my-records', {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
+        async function fetchAttendance() {
+            try {
+                const res = await fetch('/api/v1/attendance/my-records', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
 
-            if (!res.ok) {
-                const err = await res.json();
-                container.innerHTML = `
+                if (!res.ok) {
+                    const err = await res.json();
+                    container.innerHTML = `
                     <div style="text-align:center; padding:3rem;">
-                        <img src="/static/images/empty.jpg" style="height:120px; opacity:0.5; margin-bottom:1rem;">
+                        <img src="/static/images/empty.png" style="height:120px; opacity:0.5; margin-bottom:1rem;">
                         <h3 style="color:#64748b">${err.detail}</h3>
                     </div>`;
-                meta.textContent = "Unlinked Account";
-                return;
-            }
+                    meta.textContent = "Unlinked Account";
+                    return;
+                }
 
-            const data = await res.json();
-            meta.textContent = `Employee ID: ${data.employee_code} | Name: ${data.employee_name}`;
-            syncBadge.style.display = 'inline-block';
+                const data = await res.json();
+                meta.textContent = `Employee ID: ${data.employee_code} | Name: ${data.employee_name}`;
+                syncBadge.style.display = 'inline-block';
 
-            if (data.history.length === 0) {
-                container.innerHTML = `
+                if (data.history.length === 0) {
+                    container.innerHTML = `
                     <div style="text-align:center; padding:3rem;">
                         <p style="color:#64748b">No attendance history has been finalized by your manager yet.</p>
                     </div>`;
-                return;
-            }
+                    return;
+                }
 
-            container.innerHTML = data.history.map(item => `
+                container.innerHTML = data.history.map(item => `
                 <div class="month-card">
                     <div class="month-header" onclick="toggleAccordion(this)">
                         <span class="month-title">${getMonthName(item.month)} ${item.year}</span>
@@ -88,39 +161,39 @@ function onPageLoad(token) {
                     <div class="month-body">
                         <div class="attendance-grid-mini">
                             ${item.days.map(d => {
-                                const dayNum = new Date(d.attendance_date).getUTCDate();
-                                const safeStatus = d.status.replace(/\s+/g, '_');
-                                return `
+                    const dayNum = new Date(d.attendance_date).getUTCDate();
+                    const safeStatus = d.status.replace(/\s+/g, '_');
+                    return `
                                     <div class="day-box status-${safeStatus}">
                                         <span class="day-num">${dayNum}</span>
                                         <span class="day-status">${d.status}</span>
                                     </div>
                                 `;
-                            }).join('')}
+                }).join('')}
                         </div>
                     </div>
                 </div>
             `).join('');
 
-        } catch (e) {
-            container.innerHTML = `<p style="color:red; text-align:center;">Network error loading records.</p>`;
+            } catch (e) {
+                container.innerHTML = `<p style="color:red; text-align:center;">Network error loading records.</p>`;
+            }
         }
+
+        window.toggleAccordion = (header) => {
+            const body = header.nextElementSibling;
+            const arrow = header.querySelector('span:last-child');
+            const isOpen = body.style.display === 'block';
+
+            body.style.display = isOpen ? 'none' : 'block';
+            arrow.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(180deg)';
+        };
+
+        function getMonthName(m) {
+            return new Intl.DateTimeFormat('en-US', { month: 'long' }).format(new Date(2000, m - 1));
+        }
+
+        fetchAttendance();
     }
-
-    window.toggleAccordion = (header) => {
-        const body = header.nextElementSibling;
-        const arrow = header.querySelector('span:last-child');
-        const isOpen = body.style.display === 'block';
-        
-        body.style.display = isOpen ? 'none' : 'block';
-        arrow.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(180deg)';
-    };
-
-    function getMonthName(m) {
-        return new Intl.DateTimeFormat('en-US', { month: 'long' }).format(new Date(2000, m - 1));
-    }
-
-    fetchAttendance();
-}
 </script>
 {% endblock %}

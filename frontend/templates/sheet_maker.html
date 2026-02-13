@@ -1,4 +1,4 @@
-{% extends "dashboard_base.html" %}
+{% extends base_template %}
 
 {% block title %}Attendance Sheet{% endblock %}
 
@@ -10,27 +10,34 @@
             Quickly generate a monthly grid. Select an organisation to load its pre-defined employee list.
         </p>
 
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; align-items: flex-end;">
+        <div
+            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; align-items: flex-end;">
             <div class="form-group">
-                <label style="display:block; margin-bottom:5px; font-weight:600; font-size:0.8rem;">1. Organisation</label>
-                <select id="target_org_id" style="width:100%; padding:10px; border:1px solid var(--color-border); border-radius:8px;">
+                <label style="display:block; margin-bottom:5px; font-weight:600; font-size:0.8rem;">1.
+                    Organisation</label>
+                <select id="target_org_id"
+                    style="width:100%; padding:10px; border:1px solid var(--color-border); border-radius:8px;">
                     <option value="">-- Manual Entry --</option>
                 </select>
             </div>
             <p id="org-hint" style="font-size:0.8rem; color:var(--color-text-muted); margin-top:4px; display:none;"></p>
             <div class="form-group">
-                <label style="display:block; margin-bottom:5px; font-weight:600; font-size:0.8rem;">2. Blank Rows</label>
-                <input type="number" id="num_rows" value="10" min="1" style="width:100%; padding:10px; border:1px solid var(--color-border); border-radius:8px;">
+                <label style="display:block; margin-bottom:5px; font-weight:600; font-size:0.8rem;">2. Employees</label>
+                <input type="number" id="num_rows" value="10" min="1"
+                    style="width:100%; padding:10px; border:1px solid var(--color-border); border-radius:8px;">
             </div>
             <div class="form-group">
                 <label style="display:block; margin-bottom:5px; font-weight:600; font-size:0.8rem;">3. Year</label>
-                <select id="year" style="width:100%; padding:10px; border:1px solid var(--color-border); border-radius:8px;"></select>
+                <select id="year"
+                    style="width:100%; padding:10px; border:1px solid var(--color-border); border-radius:8px;"></select>
             </div>
             <div class="form-group">
                 <label style="display:block; margin-bottom:5px; font-weight:600; font-size:0.8rem;">4. Month</label>
-                <select id="month" style="width:100%; padding:10px; border:1px solid var(--color-border); border-radius:8px;"></select>
+                <select id="month"
+                    style="width:100%; padding:10px; border:1px solid var(--color-border); border-radius:8px;"></select>
             </div>
-            <button id="generateBtn" class="btn" style="background:var(--color-primary); color:white; padding:11px;">Generate Grid</button>
+            <button id="generateBtn" class="btn"
+                style="background:var(--color-primary); color:white; padding:11px;">Generate Grid</button>
         </div>
     </div>
 
@@ -39,185 +46,190 @@
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.2rem;">
             <div style="display: flex; gap: 10px; align-items: center;">
                 <span style="font-size: 0.85rem; font-weight: 600;">Bulk Entry:</span>
-                <input type="text" id="bulk-val" placeholder="P" style="width: 50px; padding: 5px; border-radius: 6px; border: 1px solid #cbd5e1; text-align:center;">
-                <button onclick="applyBulk()" class="btn" style="padding: 5px 12px; font-size: 0.8rem;">Apply All</button>
+                <input type="text" id="bulk-val" placeholder="P"
+                    style="width: 50px; padding: 5px; border-radius: 6px; border: 1px solid #cbd5e1; text-align:center;">
+                <button onclick="applyBulk()" class="btn" style="padding: 5px 12px; font-size: 0.8rem;">Apply
+                    All</button>
             </div>
             <div style="display: flex; gap: 10px;">
-                <button id="saveToDbBtn" class="btn" style="background:#10b981; color:white; border:none; padding: 8px 20px;">Save to Dashboard</button>
+                <button id="saveToDbBtn" class="btn"
+                    style="background:#10b981; color:white; border:none; padding: 8px 20px;">Save to Dashboard</button>
             </div>
         </div>
-        
-        <div id="attendance-grid" style="width: 100%; height: 500px; overflow: hidden; border: 1px solid var(--color-border); border-radius: 8px;"></div>
+
+        <div id="attendance-grid"
+            style="width: 100%; height: 500px; overflow: hidden; border: 1px solid var(--color-border); border-radius: 8px;">
+        </div>
     </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-let hot;
-function onPageLoad(token, currentUser) {
-    const apiCall = async (url, options = {}) => {
-        const response = await fetch(url, { 
-            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, 
-            ...options 
-        });
-        if (response.status === 401) {
-            alert("Unauthorized. Please log in again.");
-            window.location.href = "/login";
-            return;
-        }
-        return response;
-    };
-
-    // Populate Year/Month
-    const yearSel = document.getElementById('year');
-    const monthSel = document.getElementById('month');
-    const curYear = new Date().getFullYear();
-    for(let y=curYear-1; y<=curYear+1; y++) yearSel.add(new Option(y, y));
-    yearSel.value = curYear;
-    
-    const months = ["January","February","March","April","May","June","July","August","September","October","November","December"];
-    months.forEach((m, i) => monthSel.add(new Option(m, i+1)));
-    monthSel.value = new Date().getMonth() + 1;
-
-    let orgsMeta = {}; // id -> { name, source }
-
-    async function loadOrgs() {
-        const res = await apiCall('/api/v1/organizations/for-dropdown');
-        if (!res || !res.ok) return;
-        const orgs = await res.json();
-        const select = document.getElementById('target_org_id');
-        select.innerHTML = '<option value="">-- Manual Entry --</option>';
-        orgs.forEach(o => {
-            const label = o.source === 'external' ? `${o.name} (External)` : `${o.name} (Internal)`;
-            select.add(new Option(label, o.id));
-            orgsMeta[o.id] = { name: o.name, source: o.source };
-        });
-    }
-
-    document.getElementById('target_org_id').addEventListener('change', () => {
-        const orgId = document.getElementById('target_org_id').value;
-        const hint = document.getElementById('org-hint');
-        if (!orgId) { hint.style.display = 'none'; return; }
-        const meta = orgsMeta[orgId];
-        if (meta) {
-            hint.style.display = 'block';
-            hint.textContent = meta.source === 'external'
-                ? 'Employees are loaded from ERPNext and cannot be edited.'
-                : 'Employees can be edited in Organisations → Employee Setup.';
-        }
-    });
-
-    document.getElementById('generateBtn').onclick = async () => {
-        const orgId = document.getElementById('target_org_id').value;
-        const rowCount = document.getElementById('num_rows').value;
-
-        let initialData = [];
-        const meta = orgId ? orgsMeta[orgId] : null;
-        const isExternal = meta && meta.source === 'external';
-        if (orgId) {
-            const res = await apiCall(`/api/v1/employees/?org_id=${orgId}`);
-            if (res.ok) {
-                const employees = await res.json();
-                if (Array.isArray(employees)) {
-                    initialData = employees.map(e => [e.employee_code, e.employee_name]);
-                }
+    let hot;
+    function onPageLoad(token, currentUser) {
+        const apiCall = async (url, options = {}) => {
+            const response = await fetch(url, {
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                ...options
+            });
+            if (response.status === 401) {
+                alert("Unauthorized. Please log in again.");
+                window.location.href = "/login";
+                return;
             }
-        }
-
-        if (initialData.length === 0) {
-            for (let i = 0; i < rowCount; i++) initialData.push(['', '']);
-        }
-
-        renderGrid(initialData, isExternal);
-        document.getElementById('grid-card').style.display = 'block';
-    };
-
-    function renderGrid(baseData, isExternal) {
-        const y = parseInt(yearSel.value);
-        const m = parseInt(monthSel.value);
-        const days = new Date(y, m, 0).getDate();
-        const colHeaders = ['Emp Code', 'Emp Name'];
-        const columns = [
-            { width: 90, readOnly: !!isExternal },
-            { width: 180, readOnly: !!isExternal }
-        ];
-
-        for (let d = 1; d <= days; d++) {
-            colHeaders.push(d.toString());
-            columns.push({ width: 35, type: 'dropdown', source: ['', 'P', 'A', 'L', 'HD'] });
-        }
-
-        const container = document.getElementById('attendance-grid');
-        container.innerHTML = '';
-        hot = new Handsontable(container, {
-            data: baseData,
-            colHeaders: colHeaders,
-            columns: columns,
-            rowHeaders: true,
-            minSpareRows: 1,
-            manualColumnResize: true,
-            licenseKey: 'non-commercial-and-evaluation',
-            stretchH: 'all',
-            contextMenu: true
-        });
-    }
-
-    window.applyBulk = () => {
-        const val = document.getElementById('bulk-val').value.toUpperCase();
-        if(!val) return;
-        const rows = hot.countRows() - 1;
-        const cols = hot.countCols() - 1;
-        const changes = [];
-        for(let r=0; r<rows; r++) {
-            for(let c=2; c<=cols; c++) changes.push([r, c, val]);
-        }
-        hot.setDataAtCell(changes);
-    };
-
-    document.getElementById('saveToDbBtn').onclick = async () => {
-        const btn = document.getElementById('saveToDbBtn');
-        btn.disabled = true; btn.textContent = "Saving...";
-
-        const rawData = hot.getData();
-        const headers = hot.getColHeader();
-        const formattedData = [];
-
-        rawData.forEach(row => {
-            if(!row[0]) return;
-            const obj = { "Employee Code": row[0], "Employee Name": row[1] || row[0] };
-            for(let i=2; i<row.length; i++) {
-                if(row[i]) {
-                    // Shorthand Normalizer
-                    let status = row[i];
-                    if(status === 'P') status = 'Present';
-                    if(status === 'A') status = 'Absent';
-                    if(status === 'L') status = 'On Leave';
-                    if(status === 'HD') status = 'Half Day';
-                    obj[headers[i]] = status;
-                }
-            }
-            formattedData.push(obj);
-        });
-
-        const payload = {
-            year: parseInt(yearSel.value),
-            month: parseInt(monthSel.value),
-            data: formattedData,
-            target_org_id: document.getElementById('target_org_id').value || null
+            return response;
         };
 
-        const res = await apiCall('/api/v1/sheets/save-as-job', { method: 'POST', body: JSON.stringify(payload) });
-        if(res.ok) {
-            alert("Document saved successfully!");
-            window.location.href = "/home";
-        } else {
-            alert("Failed to save. Check your connection.");
-            btn.disabled = false; btn.textContent = "Save to Dashboard";
-        }
-    };
+        // Populate Year/Month
+        const yearSel = document.getElementById('year');
+        const monthSel = document.getElementById('month');
+        const curYear = new Date().getFullYear();
+        for (let y = curYear - 1; y <= curYear + 1; y++) yearSel.add(new Option(y, y));
+        yearSel.value = curYear;
 
-    loadOrgs();
-}
+        const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+        months.forEach((m, i) => monthSel.add(new Option(m, i + 1)));
+        monthSel.value = new Date().getMonth() + 1;
+
+        let orgsMeta = {}; // id -> { name, source }
+
+        async function loadOrgs() {
+            const res = await apiCall('/api/v1/organizations/for-dropdown');
+            if (!res || !res.ok) return;
+            const orgs = await res.json();
+            const select = document.getElementById('target_org_id');
+            select.innerHTML = '<option value="">-- Manual Entry --</option>';
+            orgs.forEach(o => {
+                const label = o.source === 'external' ? `${o.name} (External)` : `${o.name} (Internal)`;
+                select.add(new Option(label, o.id));
+                orgsMeta[o.id] = { name: o.name, source: o.source };
+            });
+        }
+
+        document.getElementById('target_org_id').addEventListener('change', () => {
+            const orgId = document.getElementById('target_org_id').value;
+            const hint = document.getElementById('org-hint');
+            if (!orgId) { hint.style.display = 'none'; return; }
+            const meta = orgsMeta[orgId];
+            if (meta) {
+                hint.style.display = 'block';
+                hint.textContent = meta.source === 'external'
+                    ? 'Employees are loaded from ERPNext and cannot be edited.'
+                    : 'Employees can be edited in Organisations → Employee Setup.';
+            }
+        });
+
+        document.getElementById('generateBtn').onclick = async () => {
+            const orgId = document.getElementById('target_org_id').value;
+            const rowCount = document.getElementById('num_rows').value;
+
+            let initialData = [];
+            const meta = orgId ? orgsMeta[orgId] : null;
+            const isExternal = meta && meta.source === 'external';
+            if (orgId) {
+                const res = await apiCall(`/api/v1/employees/?org_id=${orgId}`);
+                if (res.ok) {
+                    const employees = await res.json();
+                    if (Array.isArray(employees)) {
+                        initialData = employees.map(e => [e.employee_code, e.employee_name]);
+                    }
+                }
+            }
+
+            if (initialData.length === 0) {
+                for (let i = 0; i < rowCount; i++) initialData.push(['', '']);
+            }
+
+            renderGrid(initialData, isExternal);
+            document.getElementById('grid-card').style.display = 'block';
+        };
+
+        function renderGrid(baseData, isExternal) {
+            const y = parseInt(yearSel.value);
+            const m = parseInt(monthSel.value);
+            const days = new Date(y, m, 0).getDate();
+            const colHeaders = ['Emp Code', 'Emp Name'];
+            const columns = [
+                { width: 90, readOnly: !!isExternal },
+                { width: 180, readOnly: !!isExternal }
+            ];
+
+            for (let d = 1; d <= days; d++) {
+                colHeaders.push(d.toString());
+                columns.push({ width: 35, type: 'dropdown', source: ['', 'P', 'A', 'L', 'HD'] });
+            }
+
+            const container = document.getElementById('attendance-grid');
+            container.innerHTML = '';
+            hot = new Handsontable(container, {
+                data: baseData,
+                colHeaders: colHeaders,
+                columns: columns,
+                rowHeaders: true,
+                minSpareRows: 1,
+                manualColumnResize: true,
+                licenseKey: 'non-commercial-and-evaluation',
+                stretchH: 'all',
+                contextMenu: true
+            });
+        }
+
+        window.applyBulk = () => {
+            const val = document.getElementById('bulk-val').value.toUpperCase();
+            if (!val) return;
+            const rows = hot.countRows() - 1;
+            const cols = hot.countCols() - 1;
+            const changes = [];
+            for (let r = 0; r < rows; r++) {
+                for (let c = 2; c <= cols; c++) changes.push([r, c, val]);
+            }
+            hot.setDataAtCell(changes);
+        };
+
+        document.getElementById('saveToDbBtn').onclick = async () => {
+            const btn = document.getElementById('saveToDbBtn');
+            btn.disabled = true; btn.textContent = "Saving...";
+
+            const rawData = hot.getData();
+            const headers = hot.getColHeader();
+            const formattedData = [];
+
+            rawData.forEach(row => {
+                if (!row[0]) return;
+                const obj = { "Employee Code": row[0], "Employee Name": row[1] || row[0] };
+                for (let i = 2; i < row.length; i++) {
+                    if (row[i]) {
+                        // Shorthand Normalizer
+                        let status = row[i];
+                        if (status === 'P') status = 'Present';
+                        if (status === 'A') status = 'Absent';
+                        if (status === 'L') status = 'On Leave';
+                        if (status === 'HD') status = 'Half Day';
+                        obj[headers[i]] = status;
+                    }
+                }
+                formattedData.push(obj);
+            });
+
+            const payload = {
+                year: parseInt(yearSel.value),
+                month: parseInt(monthSel.value),
+                data: formattedData,
+                target_org_id: document.getElementById('target_org_id').value || null
+            };
+
+            const res = await apiCall('/api/v1/sheets/save-as-job', { method: 'POST', body: JSON.stringify(payload) });
+            if (res.ok) {
+                alert("Document saved successfully!");
+                window.location.href = "/home";
+            } else {
+                alert("Failed to save. Check your connection.");
+                btn.disabled = false; btn.textContent = "Save to Dashboard";
+            }
+        };
+
+        loadOrgs();
+    }
 </script>
 {% endblock %}

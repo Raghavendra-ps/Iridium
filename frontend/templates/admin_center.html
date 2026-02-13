@@ -1,4 +1,4 @@
-{% extends "dashboard_base.html" %}
+{% extends base_template %}
 {% block title %}Admin Center - User Management{% endblock %}
 
 {% block content %}
@@ -62,58 +62,114 @@
             </div>
             <div class="modal-actions">
                 <button type="button" onclick="closeEditModal()" class="btn">Cancel</button>
-                <button type="submit" class="btn" style="background: var(--color-accent); color: white;">Save Changes</button>
+                <button type="submit" class="btn" style="background: var(--color-accent); color: white;">Save
+                    Changes</button>
             </div>
         </form>
     </div>
 </div>
 
 <style>
-    .modal-backdrop { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; }
-    .modal-content { background: white; padding: 2rem; border-radius: 12px; width: 450px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); }
-    .form-group { margin-bottom: 1.2rem; }
-    .form-group label { display: block; margin-bottom: 6px; font-weight: 600; font-size: 0.85rem; color: #475569; }
-    .form-group select { width: 100%; padding: 10px; border: 1px solid var(--color-border); border-radius: 8px; }
-    .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 2rem; }
-    .status-badge { padding: 4px 8px; border-radius: 99px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; }
-    .status-pending { background: #fef3c7; color: #92400e; }
-    .status-active { background: #dcfce7; color: #166534; }
+    .modal-backdrop {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+    }
+
+    .modal-content {
+        background: white;
+        padding: 2rem;
+        border-radius: 12px;
+        width: 450px;
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+    }
+
+    .form-group {
+        margin-bottom: 1.2rem;
+    }
+
+    .form-group label {
+        display: block;
+        margin-bottom: 6px;
+        font-weight: 600;
+        font-size: 0.85rem;
+        color: #475569;
+    }
+
+    .form-group select {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid var(--color-border);
+        border-radius: 8px;
+    }
+
+    .modal-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+        margin-top: 2rem;
+    }
+
+    .status-badge {
+        padding: 4px 8px;
+        border-radius: 99px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+    }
+
+    .status-pending {
+        background: #fef3c7;
+        color: #92400e;
+    }
+
+    .status-active {
+        background: #dcfce7;
+        color: #166534;
+    }
 </style>
 {% endblock %}
 
 {% block scripts %}
 <script>
-let allUsers = [];
-let allOrgs = [];
+    let allUsers = [];
+    let allOrgs = [];
 
-function onPageLoad(token) {
-    const apiCall = (url, options = {}) => fetch(url, { headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, ...options });
+    function onPageLoad(token) {
+        const apiCall = (url, options = {}) => fetch(url, { headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, ...options });
 
-    async function loadData() {
-        // Fetch Users and Orgs in parallel
-        const [uRes, oRes] = await Promise.all([
-            apiCall('/api/v1/admin/users'),
-            apiCall('/api/v1/organizations/')
-        ]);
-        allUsers = await uRes.json();
-        allOrgs = await oRes.json();
-        
-        renderTable();
-        populateOrgDropdown();
-    }
+        async function loadData() {
+            // Fetch Users and Orgs in parallel
+            const [uRes, oRes] = await Promise.all([
+                apiCall('/api/v1/admin/users'),
+                apiCall('/api/v1/organizations/')
+            ]);
+            allUsers = await uRes.json();
+            allOrgs = await oRes.json();
 
-    function populateOrgDropdown() {
-        const select = document.getElementById('edit-org');
-        select.innerHTML = '<option value="">-- No Organisation --</option>';
-        allOrgs.forEach(org => {
-            const opt = new Option(org.name, org.id);
-            select.add(opt);
-        });
-    }
+            renderTable();
+            populateOrgDropdown();
+        }
 
-    function renderTable() {
-        const body = document.getElementById('user-list-body');
-        body.innerHTML = allUsers.map(user => `
+        function populateOrgDropdown() {
+            const select = document.getElementById('edit-org');
+            select.innerHTML = '<option value="">-- No Organisation --</option>';
+            allOrgs.forEach(org => {
+                const opt = new Option(org.name, org.id);
+                select.add(opt);
+            });
+        }
+
+        function renderTable() {
+            const body = document.getElementById('user-list-body');
+            body.innerHTML = allUsers.map(user => `
             <tr style="border-bottom: 1px solid var(--color-border);">
                 <td style="padding: 12px 8px;"><strong>${user.email}</strong></td>
                 <td style="padding: 12px 8px;"><small>${user.role}</small></td>
@@ -124,40 +180,40 @@ function onPageLoad(token) {
                 </td>
             </tr>
         `).join('');
-    }
+        }
 
-    function getOrgName(id) {
-        const org = allOrgs.find(o => o.id === id);
-        return org ? org.name : 'Unknown';
-    }
+        function getOrgName(id) {
+            const org = allOrgs.find(o => o.id === id);
+            return org ? org.name : 'Unknown';
+        }
 
-    window.openEditModal = (id) => {
-        const user = allUsers.find(u => u.id === id);
-        document.getElementById('edit-user-id').value = user.id;
-        document.getElementById('edit-role').value = user.role;
-        document.getElementById('edit-status').value = user.status;
-        document.getElementById('edit-org').value = user.organization_id || "";
-        document.getElementById('edit-is-active').value = user.is_active.toString();
-        document.getElementById('editUserModal').style.display = 'flex';
-    };
-
-    window.closeEditModal = () => document.getElementById('editUserModal').style.display = 'none';
-
-    document.getElementById('editUserForm').onsubmit = async (e) => {
-        e.preventDefault();
-        const id = document.getElementById('edit-user-id').value;
-        const payload = {
-            role: document.getElementById('edit-role').value,
-            status: document.getElementById('edit-status').value,
-            organization_id: document.getElementById('edit-org').value ? parseInt(document.getElementById('edit-org').value) : null,
-            is_active: document.getElementById('edit-is-active').value === 'true'
+        window.openEditModal = (id) => {
+            const user = allUsers.find(u => u.id === id);
+            document.getElementById('edit-user-id').value = user.id;
+            document.getElementById('edit-role').value = user.role;
+            document.getElementById('edit-status').value = user.status;
+            document.getElementById('edit-org').value = user.organization_id || "";
+            document.getElementById('edit-is-active').value = user.is_active.toString();
+            document.getElementById('editUserModal').style.display = 'flex';
         };
 
-        const res = await apiCall(`/api/v1/admin/users/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
-        if (res.ok) { closeEditModal(); loadData(); }
-    };
+        window.closeEditModal = () => document.getElementById('editUserModal').style.display = 'none';
 
-    loadData();
-}
+        document.getElementById('editUserForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const id = document.getElementById('edit-user-id').value;
+            const payload = {
+                role: document.getElementById('edit-role').value,
+                status: document.getElementById('edit-status').value,
+                organization_id: document.getElementById('edit-org').value ? parseInt(document.getElementById('edit-org').value) : null,
+                is_active: document.getElementById('edit-is-active').value === 'true'
+            };
+
+            const res = await apiCall(`/api/v1/admin/users/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
+            if (res.ok) { closeEditModal(); loadData(); }
+        };
+
+        loadData();
+    }
 </script>
 {% endblock %}

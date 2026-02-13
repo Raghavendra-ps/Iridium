@@ -16,7 +16,7 @@ from PIL import Image
 from sqlalchemy.orm import joinedload
 
 from app.db.models import (ConversionJob, LinkedOrganization,
-                           MappingProfile)
+                           MappingProfile, Organization)
 from app.db.session import SessionLocal
 from app.infrastructure.celery_app import celery
 from app.infrastructure.erpnext_client import ERPNextClient
@@ -237,8 +237,9 @@ def intelligent_parser_engine(df: pd.DataFrame, config: Dict[str, Any], year: in
         if mode == "MATRIX":
             emp_code_col_target = config["employee_code_col"].strip()
             emp_name_col_target = config.get("employee_name_col", "").strip()
-            start_col_prefix = config["day_start_col"].strip()
-            end_col_prefix = config["day_end_col"].strip()
+            # Robustly clean configuration values to match cleaned DF columns
+            start_col_prefix = config["day_start_col"].strip().replace(" 00:00:00", "")
+            end_col_prefix = config["day_end_col"].strip().replace(" 00:00:00", "")
             
             emp_code_col = find_column_fuzzy(df, emp_code_col_target)
             if not emp_code_col: raise KeyError(f"Employee code column '{emp_code_col_target}' not found.")
@@ -247,7 +248,7 @@ def intelligent_parser_engine(df: pd.DataFrame, config: Dict[str, Any], year: in
             if not all([emp_code_col, start_col_prefix, end_col_prefix, mapping_rules is not None]):
                 raise ValueError("MATRIX config is missing required keys or a mapping profile is not linked.")
 
-            df = df.dropna(subset=[emp_code_col])
+            # df = df.dropna(subset=[emp_code_col]) # Don't drop yet, we might use name as fallback
             
             all_cols = df.columns.tolist()
             start_idx, end_idx = -1, -1
@@ -266,8 +267,18 @@ def intelligent_parser_engine(df: pd.DataFrame, config: Dict[str, Any], year: in
             day_columns = df.columns[start_idx : end_idx + 1]
 
             for _, row in df.iterrows():
-                emp_code = _normalize_emp_code(row[emp_code_col])
-                emp_name = _clean_emp_name(row.get(emp_name_col)) if emp_name_col and emp_name_col in row.index else emp_code
+                raw_code = row[emp_code_col]
+                emp_name = _clean_emp_name(row.get(emp_name_col)) if emp_name_col and emp_name_col in row.index else ""
+
+                # Fallback: If code is missing, use name as the code (normalized)
+                if pd.isna(raw_code) or str(raw_code).strip() == "" or str(raw_code).upper() == 'NAN':
+                    if emp_name:
+                         emp_code = _normalize_emp_code(emp_name)
+                    else:
+                         continue # Skip if both are missing
+                else:
+                    emp_code = _normalize_emp_code(raw_code)
+
                 if not emp_code or emp_code.upper() == 'NAN': continue
                 
                 for day_header in day_columns:
@@ -389,12 +400,36 @@ def submit_to_erpnext_task(self, job_id: int, employee_map: Dict[str, str]):
     try:
         job = db.query(ConversionJob).filter(ConversionJob.id == job_id).first()
         if not job: return f"Job {job_id} not found."
-        target_org = db.query(LinkedOrganization).filter(LinkedOrganization.id == job.target_org_id).first()
-        if not target_org: raise ValueError(f"Target organization not found for job {job_id}")
+        
+        # --- START OF FIX: Correct Organization Handling ---
+        # Fetch the Organization object first
+        target_org = db.query(Organization).filter(Organization.id == job.target_org_id).first()
+        if not target_org: raise ValueError(f"Target organization (ID {job.target_org_id}) not found.")
+        
+        # Check source type
+        if target_org.source == "internal":
+            # Internal organizations: Skip ERPNext submission, just mark as COMPLETED
+            print(f"Job {job_id}: Internal organization '{target_org.name}'. Skipping ERPNext submission.")
+            job.status = "COMPLETED"
+            job.completed_at = datetime.utcnow()
+            db.commit()
+            return f"Job {job.id} completed (Internal Organization - No ERPNext submission)."
+            
+        # External organizations: Fetch linked credentials
+        if not target_org.erpnext_link:
+             raise ValueError(f"External organization '{target_org.name}' has no ERPNext link configured.")
+             
+        erp_link = target_org.erpnext_link
+        # --- END OF FIX ---
+        
         job.status = "SUBMITTING"
         db.commit()
+        
         with open(job.processed_data_path, "r", encoding="utf-8") as f: records = json.load(f)
-        erp_client = ERPNextClient(base_url=target_org.erpnext_url, api_key=target_org.api_key, api_secret=target_org.api_secret)
+        
+        # Use credentials from the link
+        erp_client = ERPNextClient(base_url=erp_link.erpnext_url, api_key=erp_link.api_key, api_secret=erp_link.api_secret)
+        
         total_records, success_count, errors = len(records), 0, []
         
         async def run_submission():

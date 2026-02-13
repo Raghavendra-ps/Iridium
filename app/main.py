@@ -3,6 +3,8 @@ import logging
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
 from redis import Redis
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -23,6 +25,20 @@ app = FastAPI(
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
     redirect_slashes=False # Add this
 )
+
+
+# Add middleware to prevent caching of API responses
+class NoCacheMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        # Only add no-cache headers for API routes
+        if request.url.path.startswith("/api/"):
+            response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+            response.headers["Pragma"] = "no-cache"
+            response.headers["Expires"] = "0"
+        return response
+
+app.add_middleware(NoCacheMiddleware)
 
 
 # --- DEPENDENCIES AND HEALTH CHECKS ---

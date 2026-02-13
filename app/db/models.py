@@ -25,6 +25,8 @@ class User(Base):
     organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=True)
     role = Column(String, nullable=False, default="manager")
     status = Column(String, nullable=False, default="pending")
+    verification_code = Column(String, nullable=True)
+    is_verified = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     organization = relationship("Organization", back_populates="users")
     jobs = relationship("ConversionJob", back_populates="owner", cascade="all, delete-orphan")

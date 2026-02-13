@@ -21,13 +21,18 @@ def get_organizations_for_dropdown(
 ) -> List[Dict[str, Any]]:
     """Returns orgs for sheet maker dropdown: superadmin sees all, manager sees only their org."""
     if is_superadmin:
-        orgs = db.query(Organization).order_by(Organization.name).all()
+        orgs = db.query(Organization).order_by(Organization.name).options(joinedload(Organization.erpnext_link)).all()
     else:
         if not user_organization_id:
             return []
-        orgs = db.query(Organization).filter(Organization.id == user_organization_id).all()
+        orgs = db.query(Organization).filter(Organization.id == user_organization_id).options(joinedload(Organization.erpnext_link)).all()
     return [
-        {"id": o.id, "name": o.name, "source": getattr(o, "source", "internal") or "internal"}
+        {
+            "id": o.id,
+            "name": o.name,
+            "source": getattr(o, "source", "internal") or "internal",
+            "is_linked": True if o.erpnext_link else False
+        }
         for o in orgs
     ]
 
@@ -101,6 +106,15 @@ def get_linked_organizations_for_org(db: Session, *, org_id: int) -> List[Linked
     )
 
 
+def get_all_linked_organizations(db: Session) -> List[LinkedOrganization]:
+    """Returns all ERPNext links for all organizations. For use by superadmins."""
+    return (
+        db.query(LinkedOrganization)
+        .options(joinedload(LinkedOrganization.organization))
+        .all()
+    )
+
+
 def delete_linked_organization(db: Session, *, link_id: int, org_id: int) -> Dict[str, Any]:
     """Deletes a linked organization record if it belongs to the given org. Returns data for response."""
     link = (
@@ -112,6 +126,29 @@ def delete_linked_organization(db: Session, *, link_id: int, org_id: int) -> Dic
     if not link:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Linked organization not found.")
     # Build response data before delete (ORM object will be expired after commit)
+    result = {
+        "id": link.id,
+        "organization_id": str(link.organization_id),
+        "erpnext_url": link.erpnext_url,
+        "api_key": link.api_key,
+        "instance_name": link.instance_name,
+    }
+    db.delete(link)
+    db.commit()
+    return result
+
+
+def delete_linked_organization_any(db: Session, *, link_id: int) -> Dict[str, Any]:
+    """Deletes a linked organization record by ID (Superadmin only)."""
+    link = (
+        db.query(LinkedOrganization)
+        .filter(LinkedOrganization.id == link_id)
+        .options(joinedload(LinkedOrganization.organization))
+        .first()
+    )
+    if not link:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Linked organization not found.")
+    
     result = {
         "id": link.id,
         "organization_id": str(link.organization_id),

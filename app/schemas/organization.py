@@ -12,6 +12,7 @@ class ERPNextLinkBase(BaseModel):
 
 class ERPNextLinkCreate(ERPNextLinkBase):
     api_secret: str
+    organization_id: Optional[int] = None
 
 class ERPNextLink(ERPNextLinkBase):
     class Config:
@@ -41,6 +42,7 @@ class OrganizationForDropdown(BaseModel):
     id: int
     name: str
     source: str  # 'internal' | 'external'
+    is_linked: bool  # Whether it has an ERPNext link
 
 
 class ExternalOrganizationCreate(BaseModel):

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
@@ -8,6 +8,10 @@ from app.core.services import user_service
 from app.core import security
 from app.db.session import get_db
 from app.db.models import User, Organization
+from app.core.email import send_verification_email
+import asyncio
+from pydantic import BaseModel
+
 
 router = APIRouter()
 
@@ -64,7 +68,7 @@ def list_orgs_public(db: Session = Depends(get_db)):
     return db.query(Organization).all()
 
 @router.post("/register", response_model=user_schemas.User, status_code=status.HTTP_201_CREATED)
-def register_user(*, db: Session = Depends(get_db), user_in: user_schemas.UserCreate):
+def register_user(*, db: Session = Depends(get_db), user_in: user_schemas.UserCreate, background_tasks: BackgroundTasks):
     # 1. Email check
     if user_service.get_user_by_email(db, email=user_in.email):
         raise HTTPException(status_code=400, detail="Email already registered.")
@@ -92,4 +96,48 @@ def register_user(*, db: Session = Depends(get_db), user_in: user_schemas.UserCr
         organization_id=org_id,
         role="client" 
     )
+
+    # --- Send Verification Email ---
+    if new_user.verification_code:
+        # Use BackgroundTasks for reliable async execution in sync/async contexts
+        background_tasks.add_task(send_verification_email, new_user.email, new_user.verification_code)
+
     return new_user
+
+class VerificationRequest(BaseModel):
+    email: str
+    code: str
+
+@router.post("/verify-email")
+def verify_email_endpoint(req: VerificationRequest, db: Session = Depends(get_db)):
+    """Verifies the user's email address."""
+    user = user_service.get_user_by_email(db, email=req.email)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    if user.is_verified:
+        return {"message": "Email already verified"}
+
+    if user_service.verify_user_email(db, user=user, code=req.code):
+        return {"message": "Email verified successfully"}
+    
+    raise HTTPException(status_code=400, detail="Invalid verification code")
+
+class ResendRequest(BaseModel):
+    email: str
+
+@router.post("/resend-verification")
+def resend_code_endpoint(req: ResendRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    """Resends the verification code."""
+    user = user_service.get_user_by_email(db, email=req.email)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    if user.is_verified:
+        return {"message": "Email already verified"}
+        
+    code = user_service.resend_verification_code(db, user=user)
+    # Use BackgroundTasks here too
+    background_tasks.add_task(send_verification_email, user.email, code)
+    
+    return {"message": "Verification code sent"}

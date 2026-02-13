@@ -1,4 +1,4 @@
-{% extends "dashboard_base.html" %}
+{% extends base_template %}
 
 {% block title %}Manage Employees{% endblock %}
 
@@ -8,7 +8,8 @@
     <p style="color: var(--color-text-muted); margin-bottom: 1.5rem;">
         Manually add an employee to your organization. This is for organizations not linked to an ERPNext instance.
     </p>
-    <form id="newEmployeeForm" style="display: grid; grid-template-columns: 1fr 1fr 0.5fr; align-items: flex-end; gap: 1rem;">
+    <form id="newEmployeeForm"
+        style="display: grid; grid-template-columns: 1fr 1fr 0.5fr; align-items: flex-end; gap: 1rem;">
         <div class="form-group">
             <label for="employee_code">Employee Code</label>
             <input type="text" id="employee_code" name="employee_code" required placeholder="e.g., EMP001">
@@ -17,7 +18,8 @@
             <label for="employee_name">Full Name</label>
             <input type="text" id="employee_name" name="employee_name" required placeholder="e.g., John Doe">
         </div>
-        <button type="submit" class="btn" style="background-color: var(--color-accent); color: white; padding: 10px 20px;">Add Employee</button>
+        <button type="submit" class="btn"
+            style="background-color: var(--color-accent); color: white; padding: 10px 20px;">Add Employee</button>
     </form>
     <div id="formStatus" style="margin-top: 1rem; font-size: 0.9rem;"></div>
 </div>
@@ -32,45 +34,72 @@
 <!-- You can add a modal here for editing later if needed -->
 
 <style>
-    .form-group { margin-bottom: 0; }
-    .form-group label { display: block; margin-bottom: 8px; font-weight: 500; }
-    .form-group input { width: 100%; padding: 10px; border: 1px solid var(--color-border); border-radius: 8px; font-size: 1rem; }
-    #employees-list-container table { width: 100%; border-collapse: collapse; text-align: left; }
-    #employees-list-container th, #employees-list-container td { padding: 12px 8px; border-bottom: 1px solid var(--color-border); }
-    #employees-list-container th { font-weight: 600; }
+    .form-group {
+        margin-bottom: 0;
+    }
+
+    .form-group label {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: 500;
+    }
+
+    .form-group input {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid var(--color-border);
+        border-radius: 8px;
+        font-size: 1rem;
+    }
+
+    #employees-list-container table {
+        width: 100%;
+        border-collapse: collapse;
+        text-align: left;
+    }
+
+    #employees-list-container th,
+    #employees-list-container td {
+        padding: 12px 8px;
+        border-bottom: 1px solid var(--color-border);
+    }
+
+    #employees-list-container th {
+        font-weight: 600;
+    }
 </style>
 {% endblock %}
 
 {% block scripts %}
 <script>
-function onPageLoad(token, currentUser) {
-    // This page is for managers or above.
-    if (!['superadmin', 'employee', 'manager'].includes(currentUser.role)) {
-        alert("Access Denied. You do not have permission to manage employees.");
-        window.location.href = "/home";
-        return;
-    }
+    function onPageLoad(token, currentUser) {
+        // This page is for managers or above.
+        if (!['superadmin', 'employee', 'manager'].includes(currentUser.role)) {
+            alert("Access Denied. You do not have permission to manage employees.");
+            window.location.href = "/home";
+            return;
+        }
 
-    const newEmployeeForm = document.getElementById('newEmployeeForm');
-    const formStatus = document.getElementById('formStatus');
-    const employeesListContainer = document.getElementById('employees-list-container');
-    
-    const apiCall = (url, options = {}) => fetch(url, { headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, ...options });
+        const newEmployeeForm = document.getElementById('newEmployeeForm');
+        const formStatus = document.getElementById('formStatus');
+        const employeesListContainer = document.getElementById('employees-list-container');
 
-    async function loadEmployees() {
-        try {
-            const response = await apiCall('/api/v1/employees/');
-            if (!response.ok) throw new Error('Failed to fetch employees.');
-            
-            const employees = await response.json();
-            
-            if (employees.length === 0) {
-                employeesListContainer.innerHTML = `<p style="color: var(--color-text-muted);">No employees have been added to your organization yet.</p>`;
-                return;
-            }
+        const apiCall = (url, options = {}) => fetch(url, { headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, ...options });
 
-            const table = document.createElement('table');
-            table.innerHTML = `
+        async function loadEmployees() {
+            try {
+                const response = await apiCall('/api/v1/employees/');
+                if (!response.ok) throw new Error('Failed to fetch employees.');
+
+                const employees = await response.json();
+
+                if (employees.length === 0) {
+                    employeesListContainer.innerHTML = `<p style="color: var(--color-text-muted);">No employees have been added to your organization yet.</p>`;
+                    return;
+                }
+
+                const table = document.createElement('table');
+                table.innerHTML = `
                 <thead>
                     <tr>
                         <th>Employee Code</th>
@@ -90,65 +119,65 @@ function onPageLoad(token, currentUser) {
                     `).join('')}
                 </tbody>
             `;
-            employeesListContainer.innerHTML = '';
-            employeesListContainer.appendChild(table);
+                employeesListContainer.innerHTML = '';
+                employeesListContainer.appendChild(table);
 
-        } catch (error) {
-            employeesListContainer.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+            } catch (error) {
+                employeesListContainer.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+            }
         }
-    }
 
-    newEmployeeForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const submitButton = e.target.querySelector('button[type="submit"]');
-        submitButton.disabled = true;
-        submitButton.textContent = 'Adding...';
-        formStatus.textContent = '';
+        newEmployeeForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const submitButton = e.target.querySelector('button[type="submit"]');
+            submitButton.disabled = true;
+            submitButton.textContent = 'Adding...';
+            formStatus.textContent = '';
 
-        const payload = {
-            employee_code: document.getElementById('employee_code').value,
-            employee_name: document.getElementById('employee_name').value
+            const payload = {
+                employee_code: document.getElementById('employee_code').value,
+                employee_name: document.getElementById('employee_name').value
+            };
+
+            try {
+                const response = await apiCall('/api/v1/employees/', {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.detail || 'Failed to add employee.');
+
+                formStatus.textContent = `Successfully added employee "${data.employee_name}"!`;
+                formStatus.style.color = 'green';
+                newEmployeeForm.reset();
+                loadEmployees();
+
+            } catch (error) {
+                formStatus.textContent = `Error: ${error.message}`;
+                formStatus.style.color = 'red';
+            } finally {
+                submitButton.disabled = false;
+                submitButton.textContent = 'Add Employee';
+            }
+        });
+
+        window.deleteEmployee = async (employeeId) => {
+            if (!confirm('Are you sure you want to delete this employee? This action cannot be undone.')) return;
+
+            try {
+                const response = await apiCall(`/api/v1/employees/${employeeId}`, { method: 'DELETE' });
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || "Failed to delete.");
+                }
+                loadEmployees();
+            } catch (error) {
+                alert(`Error: ${error.message}`);
+            }
         };
 
-        try {
-            const response = await apiCall('/api/v1/employees/', {
-                method: 'POST',
-                body: JSON.stringify(payload)
-            });
-            
-            const data = await response.json();
-            if (!response.ok) throw new Error(data.detail || 'Failed to add employee.');
-
-            formStatus.textContent = `Successfully added employee "${data.employee_name}"!`;
-            formStatus.style.color = 'green';
-            newEmployeeForm.reset();
-            loadEmployees();
-
-        } catch (error) {
-            formStatus.textContent = `Error: ${error.message}`;
-            formStatus.style.color = 'red';
-        } finally {
-            submitButton.disabled = false;
-            submitButton.textContent = 'Add Employee';
-        }
-    });
-
-    window.deleteEmployee = async (employeeId) => {
-        if (!confirm('Are you sure you want to delete this employee? This action cannot be undone.')) return;
-
-        try {
-            const response = await apiCall(`/api/v1/employees/${employeeId}`, { method: 'DELETE' });
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.detail || "Failed to delete.");
-            }
-            loadEmployees();
-        } catch (error) {
-            alert(`Error: ${error.message}`);
-        }
-    };
-
-    loadEmployees();
-}
+        loadEmployees();
+    }
 </script>
 {% endblock %}

@@ -44,7 +44,16 @@ def analyze_file_structure(
             max_score = score
             best_header_index = i
 
-    headers = df.iloc[best_header_index].astype(str).str.strip()
+    # Clean headers to match logic in read_tabular_file
+    raw_headers = df.iloc[best_header_index]
+    headers = []
+    for h in raw_headers:
+        h_str = str(h).strip()
+        if ' 00:00:00' in h_str:
+            h_str = h_str.replace(' 00:00:00', '')
+        headers.append(h_str)
+    
+    headers = pd.Index(headers)
     data_df = df.iloc[best_header_index + 1 :].copy()
     data_df.columns = headers
 

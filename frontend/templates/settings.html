@@ -1,130 +1,13 @@
-{% extends "dashboard_base.html" %} {% block title %}Settings{% endblock %} {% block content %}
+{% extends base_template %} {% block title %}Settings{% endblock %} {% block content %}
 
-<!-- Card for Linking Organizations -->
-<div class="card">
-    <h1 class="card-title">Link New Organization</h1>
-    <p style="color: var(--color-text-muted); margin-bottom: 1.5rem">
-        Enter the connection details for an ERPNext instance.
-    </p>
-    <form
-        id="newLinkForm"
-        style="
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 1.5rem;
-            align-items: flex-end;
-        "
-    >
-        <div class="form-group">
-            <label
-                for="organization_id"
-                style="display: block; margin-bottom: 8px; font-weight: 500"
-                >1. Organization</label
-            >
-            <select
-                id="organization_id"
-                name="organization_id"
-                required
-                style="
-                    width: 100%;
-                    padding: 10px;
-                    border: 1px solid var(--color-border);
-                    border-radius: 8px;
-                "
-            >
-                <option value="">Loading organizations...</option>
-            </select>
-        </div>
-        <div class="form-group">
-            <label
-                for="erpnext_url"
-                style="display: block; margin-bottom: 8px; font-weight: 500"
-                >2. ERPNext URL</label
-            >
-            <input
-                type="url"
-                id="erpnext_url"
-                name="erpnext_url"
-                placeholder="https://your-company.erpnext.com"
-                required
-                style="
-                    width: 100%;
-                    padding: 10px;
-                    border: 1px solid var(--color-border);
-                    border-radius: 8px;
-                "
-            />
-        </div>
-        <div class="form-group">
-            <label
-                for="api_secret"
-                style="display: block; margin-bottom: 8px; font-weight: 500"
-                >3. API Secret</label
-            >
-            <input
-                type="password"
-                id="api_secret"
-                name="api_secret"
-                required
-                style="
-                    width: 100%;
-                    padding: 10px;
-                    border: 1px solid var(--color-border);
-                    border-radius: 8px;
-                "
-            />
-        </div>
-        <div class="form-group">
-            <label
-                for="api_key"
-                style="display: block; margin-bottom: 8px; font-weight: 500"
-                >4. API Key</label
-            >
-            <input
-                type="text"
-                id="api_key"
-                name="api_key"
-                required
-                style="
-                    width: 100%;
-                    padding: 10px;
-                    border: 1px solid var(--color-border);
-                    border-radius: 8px;
-                "
-            />
-        </div>
-        <div
-            class="form-actions"
-            style="
-                grid-column: 2 / -1;
-                display: flex;
-                justify-content: flex-end;
-                align-items: center;
-                gap: 1rem;
-            "
-        >
-            <div
-                id="form-status"
-                style="
-                    font-size: 0.9rem;
-                    min-height: 1.2rem;
-                    flex-grow: 1;
-                    text-align: right;
-                "
-            ></div>
-            <button
-                type="submit"
-                class="btn"
-                style="background-color: var(--color-accent); color: white"
-            >
-                Link Organization
-            </button>
-        </div>
-    </form>
-</div>
+<!-- 'Link New Organization' form removed as per user request. 
+     External organizations are now linked automatically upon creation in the Organizations tab. 
+-->
 <div class="card">
     <h2 class="card-title">Linked Organizations</h2>
-    <div id="orgs-list"><p>Loading...</p></div>
+    <div id="orgs-list">
+        <p>Loading...</p>
+    </div>
 </div>
 
 <!-- Card for Attendance Mapping Profiles -->
@@ -135,63 +18,40 @@
         to standard ERPNext statuses.
     </p>
     <form id="newMappingProfileForm">
-        <div
-            style="
+        <div style="
                 display: flex;
                 gap: 1rem;
                 align-items: flex-end;
                 margin-bottom: 1.5rem;
-            "
-        >
+            ">
             <div style="flex-grow: 1">
-                <label
-                    for="profile_name"
-                    style="display: block; margin-bottom: 8px; font-weight: 500"
-                    >Profile Name</label
-                >
-                <input
-                    type="text"
-                    id="profile_name"
-                    placeholder="e.g., Factory Attendance Codes"
-                    required
-                    style="
+                <label for="profile_name" style="display: block; margin-bottom: 8px; font-weight: 500">Profile
+                    Name</label>
+                <input type="text" id="profile_name" placeholder="e.g., Factory Attendance Codes" required style="
                         width: 100%;
                         padding: 10px;
                         border: 1px solid var(--color-border);
                         border-radius: 8px;
-                    "
-                />
+                    " />
             </div>
             <button type="button" id="add-mapping-row-btn" class="btn">
                 Add Row
             </button>
         </div>
-        <div
-            id="mapping-rows-container"
-            style="
+        <div id="mapping-rows-container" style="
                 display: flex;
                 flex-direction: column;
                 gap: 0.5rem;
                 margin-bottom: 1.5rem;
-            "
-        ></div>
-        <div
-            style="
+            "></div>
+        <div style="
                 display: flex;
                 justify-content: flex-end;
                 align-items: center;
                 gap: 1rem;
-            "
-        >
-            <div
-                id="mapping-form-status"
-                style="font-size: 0.9rem; min-height: 1.2rem"
-            ></div>
-            <button
-                type="submit"
-                class="btn"
-                style="background-color: var(--color-accent); color: white"
-            >
+            ">
+            <div id="mapping-form-status" style="font-size: 0.9rem; min-height: 1.2rem"></div>
+            <button type="submit" class="btn" style="background-color: var(--color-accent); color: white">
                 Save as New Profile
             </button>
         </div>
@@ -199,22 +59,28 @@
 </div>
 <div class="card">
     <h2 class="card-title">My Mapping Profiles</h2>
-    <div id="profiles-list"><p>Loading profiles...</p></div>
+    <div id="profiles-list">
+        <p>Loading profiles...</p>
+    </div>
 </div>
 
 {% endblock %} {% block scripts %}
 <script>
     function onPageLoad(token) {
         const apiCall = async (url, options = {}) => {
+            // Add timestamp to URL to force cache bypass
+            const separator = url.includes('?') ? '&' : '?';
+            const cacheBustedUrl = `${url}${separator}_t=${new Date().getTime()}`;
+
             const defaultOptions = {
                 headers: {
                     Authorization: `Bearer ${token}`,
-                    "Content-Type": "application/json",
-                },
+                    "Content-Type": "application/json"
+                }
             };
             const merged = { ...defaultOptions, ...options };
             merged.headers = { ...defaultOptions.headers, ...(options.headers || {}) };
-            const response = await fetch(url, merged);
+            const response = await fetch(cacheBustedUrl, merged);
             if (response.status === 401) {
                 window.location.href = "/login";
                 throw new Error("Unauthorized");
@@ -281,19 +147,21 @@
         };
 
         const fetchExternalOrgs = async () => {
+            orgSelect.innerHTML = '<option value="">Loading organizations...</option>';
             try {
-                // This is a public endpoint, so no auth header is needed.
-                const response = await fetch("https://gateway.gretis.com/api/v1/orgs");
-                if (!response.ok) throw new Error("Could not load external organization list.");
-                const externalOrgs = await response.json();
-                
+                const response = await apiCall("/api/v1/organizations/for-dropdown");
+                if (!response.ok) throw new Error("Could not load organization list.");
+                const localOrgs = await response.json();
+
                 orgSelect.innerHTML = '<option value="" disabled selected>-- Select an Organisation --</option>';
-                externalOrgs.forEach(org => {
-                    const option = new Option(`${org.name} (${org.organization_id})`, org.organization_id);
+                localOrgs.forEach(org => {
+                    // Show source in label
+                    const sourceLabel = org.source === 'external' ? ' (External)' : ' (Internal)';
+                    const option = new Option(`${org.name}${sourceLabel}`, org.id);
                     orgSelect.add(option);
                 });
             } catch (error) {
-                orgSelect.innerHTML = `<option value="">Error: ${error.message}</option>`;
+                orgSelect.innerHTML = `<option value="">Error: ${errorMessage(error)}</option>`;
             }
         };
 

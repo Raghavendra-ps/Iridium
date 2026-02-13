@@ -53,6 +53,11 @@ def list_jobs(
         # Filter by owner for everyone except SuperAdmins
         query = query.filter(ConversionJob.owner_id == current_user.id)
     
+    # Filter out initial/transient statuses as per user request to only see "submitted/saved" records
+    # We keep 'AWAITING_VALIDATION' because the user needs to see it to take action.
+    # We filter out: UPLOADED, ANALYZING, PENDING (processing)
+    query = query.filter(ConversionJob.status.notin_(['UPLOADED', 'ANALYZING', 'PENDING']))
+    
     jobs = query.order_by(ConversionJob.created_at.desc()).all()
     
     return [{

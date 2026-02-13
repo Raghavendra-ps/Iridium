@@ -12,7 +12,8 @@ ENV PATH="$POETRY_HOME/bin:$PATH"
 RUN apt-get update && apt-get install -y curl && curl -sSL https://install.python-poetry.org | python3 - && apt-get clean
 WORKDIR /app
 COPY pyproject.toml poetry.lock ./
-RUN poetry lock --no-update
+# Lock file should be updated locally 
+
 RUN poetry install --no-interaction --no-ansi
 
 # Stage 2: Production image

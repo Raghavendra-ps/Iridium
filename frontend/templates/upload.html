@@ -1,4 +1,4 @@
-{% extends "dashboard_base.html" %} {% block title %}New Conversion{% endblock
+{% extends base_template %} {% block title %}New Conversion{% endblock
 %} {% block content %}
 <div class="card">
     <h1 class="card-title">Step 1: Upload a File for Analysis</h1>
@@ -6,100 +6,65 @@
         Select the attendance period and the source file to begin the
         intelligent analysis process.
     </p>
-    <form
-        id="analysisForm"
-        style="display: flex; flex-direction: column; gap: 1.5rem"
-    >
+    <form id="analysisForm" style="display: flex; flex-direction: column; gap: 1.5rem">
         <!-- 1. Attendance Period -->
-        <div
-            id="attendance-period-group"
-            style="display: grid; gap: 1.5rem; grid-template-columns: 1fr 1fr"
-        >
+        <div id="attendance-period-group" style="display: grid; gap: 1.5rem; grid-template-columns: 1fr 1fr">
             <div class="form-group">
-                <label
-                    for="attendance_year"
-                    style="display: block; margin-bottom: 8px; font-weight: 500"
-                    >Attendance Year</label
-                >
-                <select
-                    id="attendance_year"
-                    name="attendance_year"
-                    required
-                    style="
+                <label for="attendance_year" style="display: block; margin-bottom: 8px; font-weight: 500">Attendance
+                    Year</label>
+                <select id="attendance_year" name="attendance_year" required style="
                         width: 100%;
                         padding: 10px;
                         border: 1px solid var(--color-border);
                         border-radius: 8px;
                         background-color: white;
-                    "
-                ></select>
+                    "></select>
+
+                <!-- MD5 Hashing Library -->
+                <script src="https://cdnjs.cloudflare.com/ajax/libs/spark-md5/3.0.2/spark-md5.min.js"></script>
+
             </div>
             <div class="form-group">
-                <label
-                    for="attendance_month"
-                    style="display: block; margin-bottom: 8px; font-weight: 500"
-                    >Attendance Month</label
-                >
-                <select
-                    id="attendance_month"
-                    name="attendance_month"
-                    required
-                    style="
+                <label for="attendance_month" style="display: block; margin-bottom: 8px; font-weight: 500">Attendance
+                    Month</label>
+                <select id="attendance_month" name="attendance_month" required style="
                         width: 100%;
                         padding: 10px;
                         border: 1px solid var(--color-border);
                         border-radius: 8px;
                         background-color: white;
-                    "
-                ></select>
+                    "></select>
             </div>
         </div>
 
         <!-- 2. File Input -->
         <div class="form-group">
-            <label
-                for="fileInput"
-                style="display: block; margin-bottom: 8px; font-weight: 500"
-                >Source File</label
-            >
+            <label for="fileInput" style="display: block; margin-bottom: 8px; font-weight: 500">Source File</label>
             <div style="font-size: 0.85rem; color: #666; margin-bottom: 5px">
                 Supported: Excel (.xlsx, .xls), CSV.
             </div>
-            <input
-                type="file"
-                id="fileInput"
-                name="file"
-                required
-                accept=".xlsx,.xls,.csv"
-                style="
+            <input type="file" id="fileInput" name="file" required accept=".xlsx,.xls,.csv" style="
                     width: 100%;
                     padding: 10px;
                     border: 1px solid var(--color-border);
                     border-radius: 8px;
-                "
-            />
+                " />
         </div>
 
         <!-- 3. Actions -->
-        <div
-            style="
+        <div style="
                 display: flex;
                 justify-content: flex-end;
                 align-items: center;
                 gap: 1rem;
-            "
-        >
+            ">
             <div id="statusMessage" style="font-size: 0.9rem"></div>
-            <button
-                type="submit"
-                class="btn"
-                style="
+            <button type="submit" class="btn" style="
                     background-color: var(--color-accent);
                     color: white;
                     font-size: 1rem;
                     padding: 12px 24px;
-                "
-            >
+                ">
                 Analyze File
             </button>
         </div>
@@ -208,8 +173,8 @@
                 type === "error"
                     ? "red"
                     : type === "success"
-                      ? "green"
-                      : "#333";
+                        ? "green"
+                        : "#333";
         }
     });
 </script>

@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verify Email</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #f4f1eb;
+            margin: 0;
+        }
+
+        .container {
+            background: white;
+            padding: 2.5rem;
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+            width: 420px;
+            text-align: center;
+        }
+
+        .logo {
+            height: 80px;
+            margin-bottom: 1.5rem;
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        h2 {
+            color: #1e293b;
+            margin-bottom: 0.5rem;
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        p.subtitle {
+            color: #64748b;
+            margin-bottom: 2rem;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+            text-align: left;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #475569;
+            font-weight: 600;
+            font-size: 0.85rem;
+        }
+
+        input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            box-sizing: border-box;
+            font-size: 1.2rem;
+            letter-spacing: 4px;
+            text-align: center;
+            text-transform: uppercase;
+            transition: border-color 0.2s;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #2563eb;
+            ring: 2px #bfdbfe;
+        }
+
+        button.submit-btn {
+            width: 100%;
+            padding: 0.85rem;
+            border: none;
+            border-radius: 8px;
+            background-color: #2563eb;
+            color: white;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        button.submit-btn:hover {
+            background-color: #1d4ed8;
+        }
+
+        button.submit-btn:disabled {
+            background-color: #94a3b8;
+            cursor: not-allowed;
+        }
+
+        .resend-link {
+            margin-top: 1.5rem;
+            font-size: 0.9rem;
+            color: #64748b;
+        }
+
+        .resend-link button {
+            background: none;
+            border: none;
+            color: #2563eb;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            padding: 0;
+            font-family: inherit;
+        }
+
+        .resend-link button:hover {
+            text-decoration: underline;
+        }
+
+        .resend-link button:disabled {
+            color: #94a3b8;
+            cursor: not-allowed;
+            text-decoration: none;
+        }
+
+        .status {
+            min-height: 1.2rem;
+            margin-top: 1rem;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <img src="/static/images/logo.svg" alt="Gretis Logo" class="logo">
+        <h2>Verify Email</h2>
+        <p class="subtitle">Enter the 8-digit code sent to<br><strong id="user-email-display"></strong></p>
+
+        <form id="verify-form" onsubmit="handleVerify(event)">
+            <div class="form-group">
+                <label>Verification Code</label>
+                <input type="text" id="code" required placeholder="XXXXXXXX" maxlength="8">
+            </div>
+
+            <button type="submit" id="verifyBtn" class="submit-btn">Verify Account</button>
+        </form>
+
+        <p id="msg" class="status"></p>
+
+        <div class="resend-link">
+            Expected a code? <button onclick="resendCode()" id="resendBtn">Resend</button>
+        </div>
+    </div>
+
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const email = urlParams.get('email');
+        if (email) document.getElementById('user-email-display').textContent = email;
+
+        async function handleVerify(e) {
+            e.preventDefault();
+            const code = document.getElementById('code').value;
+            const btn = document.getElementById('verifyBtn');
+            const msg = document.getElementById('msg');
+
+            btn.disabled = true;
+            btn.textContent = "Verifying...";
+            msg.textContent = "";
+
+            try {
+                const res = await fetch('/api/v1/auth/verify-email', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, code })
+                });
+
+                const data = await res.json();
+
+                if (res.ok) {
+                    msg.style.color = '#166534'; // Green
+                    msg.textContent = "Success! Redirecting to login...";
+                    setTimeout(() => window.location.href = '/login', 1500);
+                } else {
+                    msg.style.color = '#dc2626'; // Red
+                    msg.textContent = data.detail || "Verification failed";
+                    btn.disabled = false;
+                    btn.textContent = "Verify Account";
+                }
+            } catch (err) {
+                msg.style.color = '#dc2626';
+                msg.textContent = "Network error";
+                btn.disabled = false;
+                btn.textContent = "Verify Account";
+            }
+        }
+
+        async function resendCode() {
+            const btn = document.getElementById('resendBtn');
+            const msg = document.getElementById('msg');
+            btn.disabled = true;
+            const originalText = btn.textContent;
+            btn.textContent = "Sending...";
+
+            try {
+                const res = await fetch('/api/v1/auth/resend-verification', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    msg.style.color = '#2563eb';
+                    msg.textContent = "Code sent!";
+                } else {
+                    msg.style.color = '#dc2626';
+                    msg.textContent = data.detail;
+                }
+            } catch (e) {
+                msg.style.color = '#dc2626';
+                msg.textContent = "Error sending code";
+            }
+
+            // Cooldown
+            setTimeout(() => {
+                btn.disabled = false;
+                btn.textContent = "Resend";
+            }, 30000);
+        }
+    </script>
+</body>
+
+</html>
