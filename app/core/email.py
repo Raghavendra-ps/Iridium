@@ -39,7 +39,7 @@ async def send_verification_email(email_to: EmailStr, code: str):
     message = MessageSchema(
         subject="Verify your Gretis DataPort Account",
         recipients=[email_to],
-        body=html,
+        html=html,
         subtype="html"
     )
 

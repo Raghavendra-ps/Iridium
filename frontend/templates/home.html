@@ -82,6 +82,11 @@
         background: #fef3c7;
         color: #92400e;
     }
+
+    .status-partial {
+        background: #fef3c7;
+        color: #92400e;
+    }
 </style>
 {% endblock %}
 
@@ -133,19 +138,46 @@
                 }
 
                 data.forEach(item => {
-                    const statusClass = item.status.toLowerCase().includes('failed') ? 'status-failed' :
-                        item.status.toLowerCase().includes('completed') ? 'status-completed' :
-                            item.status.toLowerCase().includes('validation') ? 'status-awaiting' : '';
+                    // Determine status class and display
+                    let statusClass = '';
+                    let statusDisplay = item.status;
+                    let errorDisplay = '';
+                    
+                    if (item.status === 'COMPLETED' && item.error_log && item.error_log.partial_success) {
+                        // Partial success - show with different color
+                        statusClass = 'status-partial';
+                        statusDisplay = 'PARTIAL SUCCESS';
+                        errorDisplay = `<div style="margin-top: 4px; font-size: 0.75rem; color: #f59e0b; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${item.error_log.summary || 'Partial success - some records skipped'}">⚠️ ${item.error_log.summary || 'Some records skipped as duplicates'}</div>`;
+                    } else if (item.status.toLowerCase().includes('failed')) {
+                        statusClass = 'status-failed';
+                        // Show error message for failed jobs
+                        if (item.error_log && item.error_log.summary) {
+                            errorDisplay = `<div style="margin-top: 4px; font-size: 0.75rem; color: #dc2626; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${item.error_log.summary.replace(/"/g, '"')}">⚠️ ${item.error_log.summary}</div>`;
+                        }
+                    } else if (item.status.toLowerCase().includes('completed')) {
+                        statusClass = 'status-completed';
+                    } else if (item.status.toLowerCase().includes('validation')) {
+                        statusClass = 'status-awaiting';
+                    }
+
+                    // Allow deletion of all jobs (backend will handle if job is currently processing)
+                    const isDeletable = true;
 
                     const row = document.createElement('tr');
                     row.style.borderBottom = '1px solid var(--color-border)';
+                    let actionButtons = `<a href="/jobs/${item.id}" class="btn" style="margin-right: 8px;">View</a>`;
+
+                    if (isDeletable && currentUser.role !== 'client') {
+                        actionButtons += `<button onclick="deleteJob(${item.id})" class="btn btn-danger" style="padding: 10px 12px;" title="Delete Job"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>`;
+                    }
+
                     row.innerHTML = `
                     <td style="padding: 16px 0;"><strong>${item.original_filename}</strong><br><small style="color: #64748b">${item.target_doctype}</small></td>
-                    ${currentUser.role === 'superadmin' ? `<td style="padding: 16px 0;">${item.owner_email}</td>` : ''}
+                    ${currentUser.role === 'superadmin' ? `<td style="padding: 16px 0;">${item.owner_email || '-'}</td>` : ''}
                     <td style="padding: 16px 0; font-size: 0.9rem;">${item.created_at}</td>
-                    <td style="padding: 16px 0;"><span class="status-pill ${statusClass}">${item.status}</span></td>
+                    <td style="padding: 16px 0;"><span class="status-pill ${statusClass}">${statusDisplay}</span>${errorDisplay}</td>
                     <td style="padding: 16px 0; text-align: right;">
-                        <a href="/jobs/${item.id}" class="btn">View</a>
+                        ${actionButtons}
                     </td>
                 `;
                     tableBody.appendChild(row);
@@ -156,6 +188,24 @@
         };
 
         fetchActivity();
+
+        window.deleteJob = async (id) => {
+            if (!confirm('Are you sure you want to delete this job? It will be moved to History.')) return;
+            try {
+                const res = await fetch(`/api/v1/conversions/${id}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (res.ok) {
+                    fetchActivity(); // Reload table
+                } else {
+                    alert('Failed to delete job.');
+                }
+            } catch (e) {
+                console.error(e);
+                alert('Error deleting job.');
+            }
+        };
     }
 </script>
 {% endblock %}

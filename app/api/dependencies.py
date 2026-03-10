@@ -20,6 +20,9 @@ def get_current_user(
     Decodes JWT token and fetches the user from the DB. 
     This ensures that role/status changes are reflected 'live'.
     """
+    # DEBUG LOGGING
+    print(f"DEBUG: get_current_user called with token: {token[:10]}...")
+    
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -30,16 +33,20 @@ def get_current_user(
             token, settings.SECRET_KEY, algorithms=[ALGORITHM]
         )
         user_id: str = payload.get("sub")
+        print(f"DEBUG: Token decoded. User ID: {user_id}")
         if user_id is None:
+            print("DEBUG: User ID is None")
             raise credentials_exception
         token_data = TokenPayload(sub=user_id)
-    except JWTError:
+    except JWTError as e:
+        print(f"DEBUG: JWT Error: {e}")
         raise credentials_exception
 
     # Live fetch from Database
     user = db.query(User).filter(User.id == int(token_data.sub)).first()
     
     if user is None:
+        print("DEBUG: User not found in DB")
         raise credentials_exception
 
     return user

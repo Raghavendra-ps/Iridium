@@ -229,10 +229,12 @@
             const allColumns = analysisResult.detected_columns;
             const selects = dynamicFieldsContainer.querySelectorAll("select");
             selects.forEach((select) => {
-                // Keep first option (if it's a default/placeholder)
-                while (select.options.length > 1) {
-                    select.remove(1);
-                }
+                // Clear existing options
+                select.innerHTML = '';
+                // Add default placeholder
+                select.add(new Option("-- Select Column --", "", true, true));
+                select.options[0].disabled = true;
+
                 allColumns.forEach((col) => select.add(new Option(col, col)));
             });
 

@@ -38,7 +38,22 @@ class NoCacheMiddleware(BaseHTTPMiddleware):
             response.headers["Expires"] = "0"
         return response
 
+from fastapi.middleware.cors import CORSMiddleware
+
+
+
+# ... (omitted)
+
 app.add_middleware(NoCacheMiddleware)
+
+# Add CORS Middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # For development/testing
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 # --- DEPENDENCIES AND HEALTH CHECKS ---

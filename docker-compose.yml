@@ -3,6 +3,7 @@
 services:
   nginx:
     image: nginx:1.25-alpine
+    restart: unless-stopped
     container_name: iridium-testing-nginx
     ports:
       - "9094:80"
@@ -14,7 +15,9 @@ services:
 
   db:
     image: postgres:15-alpine
+    stop_grace_period: 30s
     container_name: iridium-testing-db
+    restart: unless-stopped
     volumes:
       - iridium-testing-postgres-data:/var/lib/postgresql/data/
     env_file:
@@ -31,6 +34,7 @@ services:
 
   redis:
     image: redis:7-alpine
+    restart: unless-stopped
     container_name: iridium-testing-redis
     volumes:
       - iridium-testing-redis-data:/data
@@ -45,6 +49,7 @@ services:
       context: .
       dockerfile: Dockerfile.app
     container_name: iridium-testing-api
+    restart: unless-stopped
     command: >
       sh -c "python -m app.initial_data &&
       gunicorn --bind 0.0.0.0:8000 -w 4 -k uvicorn.workers.UvicornWorker app.main:app"
@@ -69,6 +74,7 @@ services:
       context: .
       dockerfile: Dockerfile.worker
     container_name: iridium-testing-worker
+    restart: unless-stopped
     command: celery -A app.infrastructure.celery_app.celery worker --loglevel=info --concurrency=8
     volumes:
       - iridium-testing-uploaded-files:/app/uploads

@@ -22,5 +22,18 @@ def get_dashboard_stats(
     Retrieve statistics for the main dashboard, including job counts by
     status and a list of recent activity.
     """
-    stats = dashboard_service.get_dashboard_stats(db=db, owner_id=current_user.id)
+    # 1. Block Employees (Attendance View Only)
+    if current_user.role == 'employee':
+        # Employees should not be accessing the main dashboard stats
+        # They have their own view at /attendance/my-records
+        raise HTTPException(status_code=403, detail="Employees restricted to attendance view only.")
+        
+    # 2. Determine Scope
+    # Managers/Superadmins see GLOBAL stats (owner_id=None)
+    # Clients see SCOPED stats (owner_id=current_user.id)
+    target_owner_id = None
+    if current_user.role == 'client':
+        target_owner_id = current_user.id
+        
+    stats = dashboard_service.get_dashboard_stats(db=db, owner_id=target_owner_id)
     return stats

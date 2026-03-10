@@ -31,17 +31,15 @@ def create_mapping_profile(
 
 
 @router.get("/", response_model=List[mapping_schemas.MappingProfile])
-def list_user_mapping_profiles(
+def list_mapping_profiles(
     *,
     db: Session = Depends(get_db),
     # --- START OF FIX: Use the correct dependency name ---
     current_user: User = Depends(dependencies.get_current_internal_user),
     # --- END OF FIX ---
 ):
-    """List all mapping profiles for the current user."""
-    return mapping_service.get_mapping_profiles_by_owner(
-        db=db, owner_id=current_user.id
-    )
+    """List all mapping profiles (Global Access)."""
+    return mapping_service.get_all_mapping_profiles(db=db)
 
 
 @router.delete("/{profile_id}", response_model=mapping_schemas.MappingProfile)
@@ -53,7 +51,7 @@ def delete_mapping_profile(
     # --- END OF FIX ---
     profile_id: int,
 ):
-    """Delete a mapping profile."""
-    return mapping_service.delete_mapping_profile(
-        db=db, owner_id=current_user.id, profile_id=profile_id
+    """Delete a mapping profile (Global Access)."""
+    return mapping_service.delete_mapping_profile_any(
+        db=db, profile_id=profile_id
     )

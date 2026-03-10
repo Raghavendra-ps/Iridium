@@ -55,6 +55,15 @@ def get_mapping_profiles_by_owner(
     )
 
 
+def get_all_mapping_profiles(db: Session) -> List[MappingProfile]:
+    """Retrieves all mapping profiles globally."""
+    return (
+        db.query(MappingProfile)
+        .order_by(MappingProfile.name)
+        .all()
+    )
+
+
 def delete_mapping_profile(
     db: Session, *, owner_id: int, profile_id: int
 ) -> MappingProfile:
@@ -69,7 +78,26 @@ def delete_mapping_profile(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Mapping profile not found."
         )
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Mapping profile not found.")
+
+    db.delete(db_profile)
+    db.commit()
+    return db_profile
+
+
+def delete_mapping_profile_any(
+    db: Session, *, profile_id: int
+) -> MappingProfile:
+    """Deletes a mapping profile by ID (Global access)."""
+    db_profile = (
+        db.query(MappingProfile)
+        .filter(MappingProfile.id == profile_id)
+        .first()
+    )
+
+    if not db_profile:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Mapping profile not found."
+        )
 
     db.delete(db_profile)
     db.commit()

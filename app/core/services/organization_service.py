@@ -17,10 +17,10 @@ def get_all_organizations(db: Session) -> List[Organization]:
 
 
 def get_organizations_for_dropdown(
-    db: Session, *, user_organization_id: Optional[int], is_superadmin: bool
+    db: Session, *, user_organization_id: Optional[int], is_internal: bool
 ) -> List[Dict[str, Any]]:
-    """Returns orgs for sheet maker dropdown: superadmin sees all, manager sees only their org."""
-    if is_superadmin:
+    """Returns orgs for sheet maker dropdown: internal (superadmin/manager) sees all, client sees only their org."""
+    if is_internal:
         orgs = db.query(Organization).order_by(Organization.name).options(joinedload(Organization.erpnext_link)).all()
     else:
         if not user_organization_id:

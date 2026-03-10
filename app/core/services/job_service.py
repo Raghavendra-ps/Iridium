@@ -29,6 +29,17 @@ def get_job_by_id(db: Session, *, job_id: int, owner_id: int) -> ConversionJob |
     )
 
 
+def get_job_by_id_global(db: Session, *, job_id: int) -> ConversionJob | None:
+    """
+    Retrieves a single job by its ID (Global Access).
+    """
+    return (
+        db.query(ConversionJob)
+        .filter(ConversionJob.id == job_id)
+        .first()
+    )
+
+
 def delete_job_by_id(db: Session, *, job_id: int) -> None:
     """Deletes a job from the database by its ID."""
     try:

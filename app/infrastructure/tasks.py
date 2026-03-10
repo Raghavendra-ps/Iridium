@@ -446,6 +446,7 @@ def submit_to_erpnext_task(self, job_id: int, employee_map: Dict[str, str]):
                     response.raise_for_status()
                     success_count += 1
                 except httpx.HTTPStatusError as e:
+                    error_message = None
                     try:
                         error_data = e.response.json()
                         if "_server_messages" in error_data:
@@ -453,15 +454,43 @@ def submit_to_erpnext_task(self, job_id: int, employee_map: Dict[str, str]):
                             error_message = ". ".join([str(m.get("message", m)) for m in messages if isinstance(m, dict)] + [str(m) for m in messages if isinstance(m, str)])
                         elif "exception" in error_data: error_message = error_data.get("exception")
                         else: error_message = str(error_data)
-                    except (json.JSONDecodeError, KeyError): error_message = e.response.text[:500]
+                    except (json.JSONDecodeError, KeyError): 
+                        error_message = e.response.text[:500]
+                    
+                    # Add HTTP status context for debugging
+                    if e.response.status_code == 417:
+                        error_message = f"HTTP 417 (Expectation Failed) - Possible duplicate or invalid data: {error_message}"
                 except Exception as e: error_message = str(e)
                 if error_message: errors.append({"record_index": i, "record_data": record, "error": error_message})
                 self.update_state(state='PROGRESS', meta={'current': i + 1, 'total': total_records})
         asyncio.run(run_submission())
 
         if errors:
-            job.status = "SUBMISSION_FAILED"
-            job.error_log = {"step": "submission", "summary": f"{len(errors)} of {total_records} records failed.", "details": errors}
+            # Check if errors are all duplicates (which means data was already uploaded)
+            all_duplicates = all("already marked" in str(err.get("error", "")).lower() or "duplicate" in str(err.get("error", "")).lower() for err in errors)
+            
+            if all_duplicates and success_count > 0:
+                # Partial Success: Some records uploaded, others skipped as duplicates
+                job.status = "COMPLETED"
+                job.error_log = {
+                    "step": "submission",
+                    "summary": f"Partial Success: {success_count} of {total_records} records uploaded. {len(errors)} records were already marked (duplicates).",
+                    "partial_success": True,
+                    "success_count": success_count,
+                    "total_count": total_records,
+                    "details": errors
+                }
+            else:
+                # Actual failures (not duplicates)
+                job.status = "SUBMISSION_FAILED"
+                job.error_log = {
+                    "step": "submission",
+                    "summary": f"{len(errors)} of {total_records} records failed.",
+                    "partial_success": False,
+                    "success_count": success_count,
+                    "total_count": total_records,
+                    "details": errors
+                }
         else:
             job.status = "COMPLETED"
         job.completed_at = datetime.utcnow()

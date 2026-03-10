@@ -112,10 +112,6 @@
 
     function initOrganizations(apiCall, errorMessage) {
         const orgsList = document.getElementById("orgs-list");
-        const newLinkForm = document.getElementById("newLinkForm");
-        const formStatus = document.getElementById("form-status");
-        const submitButton = newLinkForm.querySelector('button[type="submit"]');
-        const orgSelect = document.getElementById("organization_id");
 
         const fetchAndRenderOrgs = async () => {
             try {
@@ -146,52 +142,6 @@
             }
         };
 
-        const fetchExternalOrgs = async () => {
-            orgSelect.innerHTML = '<option value="">Loading organizations...</option>';
-            try {
-                const response = await apiCall("/api/v1/organizations/for-dropdown");
-                if (!response.ok) throw new Error("Could not load organization list.");
-                const localOrgs = await response.json();
-
-                orgSelect.innerHTML = '<option value="" disabled selected>-- Select an Organisation --</option>';
-                localOrgs.forEach(org => {
-                    // Show source in label
-                    const sourceLabel = org.source === 'external' ? ' (External)' : ' (Internal)';
-                    const option = new Option(`${org.name}${sourceLabel}`, org.id);
-                    orgSelect.add(option);
-                });
-            } catch (error) {
-                orgSelect.innerHTML = `<option value="">Error: ${errorMessage(error)}</option>`;
-            }
-        };
-
-        newLinkForm.addEventListener("submit", async (e) => {
-            e.preventDefault();
-            formStatus.textContent = "Validating...";
-            submitButton.disabled = true;
-            const data = Object.fromEntries(new FormData(e.target).entries());
-            try {
-                const response = await apiCall(
-                    "/api/v1/linked-organizations/",
-                    { method: "POST", body: JSON.stringify(data) },
-                );
-                if (!response.ok) {
-                    const errorData = await response.json().catch(() => ({}));
-                    const msg = (errorData && (typeof errorData.detail === "string" ? errorData.detail : JSON.stringify(errorData.detail))) || `HTTP Error ${response.status}`;
-                    throw new Error(msg);
-                }
-                newLinkForm.reset();
-                formStatus.textContent = "Successfully linked!";
-                formStatus.style.color = "green";
-                fetchAndRenderOrgs();
-                setTimeout(() => (formStatus.textContent = ""), 4000);
-            } catch (error) {
-                formStatus.innerHTML = `<span style="color: red;">Error: ${errorMessage(error)}</span>`;
-            } finally {
-                submitButton.disabled = false;
-            }
-        });
-
         window.deleteLink = async (linkId) => {
             if (
                 !confirm(
@@ -211,7 +161,6 @@
             }
         };
         fetchAndRenderOrgs();
-        fetchExternalOrgs();
     }
 
     function initMappingProfiles(apiCall, errorMessage) {

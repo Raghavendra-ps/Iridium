@@ -216,6 +216,8 @@
                         <!-- Operations -->
                         <li id="upload-nav-link" style="display: none;"><a href="/upload"
                                 class="{% if active_page == 'upload' %}active{% endif %}">New Conversion</a></li>
+                        <li id="history-nav-link" style="display: none;"><a href="/history"
+                                class="{% if active_page == 'history' %}active{% endif %}">Job History</a></li>
                         <li id="sheet-maker-nav-link" style="display: none;"><a href="/attendance-creation"
                                 class="{% if active_page == 'attendance-creation' %}active{% endif %}">Attendance</a>
                         </li>
@@ -280,6 +282,7 @@
                 const navElements = {
                     home: document.getElementById("home-nav-link"),
                     upload: document.getElementById("upload-nav-link"),
+                    history: document.getElementById("history-nav-link"),
                     sheetMaker: document.getElementById("sheet-maker-nav-link"),
                     attendance: document.getElementById("attendance-nav-link"),
                     organizations: document.getElementById("org-nav-link"),
@@ -289,8 +292,8 @@
 
                 // Permission Matrix
                 const permissions = {
-                    superadmin: ['home', 'upload', 'sheetMaker', 'attendance', 'organizations', 'admin', 'adminDivider'],
-                    manager: ['home', 'upload', 'sheetMaker', 'attendance'],
+                    superadmin: ['home', 'upload', 'history', 'sheetMaker', 'attendance', 'organizations', 'admin', 'adminDivider'],
+                    manager: ['home', 'upload', 'history', 'sheetMaker', 'attendance'],
                     client: ['home', 'sheetMaker'],
                     employee: ['home', 'attendance']
                 };

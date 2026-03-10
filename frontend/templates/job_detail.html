@@ -22,6 +22,36 @@
         </div>
     </div>
 
+    <!-- Error Section -->
+    <div id="error-section" class="card" style="display: none; margin-bottom: 20px; border-left: 4px solid #dc2626;">
+        <div style="display: flex; justify-content: space-between; align-items: start;">
+            <div style="flex: 1;">
+                <h3 style="color: #dc2626; margin-top: 0; display: flex; align-items: center; gap: 8px;">
+                    <i class="fas fa-exclamation-circle"></i>
+                    <span id="error-title">Submission Issues</span>
+                </h3>
+                <p id="error-summary" style="color: #7f1d1d; margin-bottom: 1rem;"></p>
+                <div id="error-details" style="max-height: 300px; overflow-y: auto; background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 12px;">
+                    <!-- Error details will be injected here -->
+                </div>
+            </div>
+            <button id="toggle-errors" style="background: none; border: none; cursor: pointer; color: #dc2626; font-size: 1.2rem; padding: 8px;" title="Toggle Error Details">
+                <i class="fas fa-chevron-down"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Partial Success Notice -->
+    <div id="partial-success-section" class="card" style="display: none; margin-bottom: 20px; border-left: 4px solid #f59e0b; background: #fffbeb;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+            <i class="fas fa-check-circle" style="color: #f59e0b; font-size: 1.5rem;"></i>
+            <div>
+                <h3 style="color: #92400e; margin: 0;">Partial Success</h3>
+                <p id="partial-success-summary" style="color: #b45309; margin: 4px 0 0 0;"></p>
+            </div>
+        </div>
+    </div>
+
     <!-- Data Interaction Card -->
     <div class="card">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
@@ -29,6 +59,9 @@
                 <h2 class="card-title" style="margin: 0;">Attendance Records</h2>
                 <input type="text" id="grid-search" placeholder="Filter rows..."
                     style="padding: 6px 12px; border: 1px solid var(--color-border); border-radius: 8px; font-size: 0.9rem; width: 250px;">
+                <button id="expandViewBtn" class="btn" style="padding: 6px 12px; font-size: 0.9rem;">
+                    <i class="fas fa-expand"></i> Expand
+                </button>
             </div>
             <div id="perm-notice"></div>
         </div>
@@ -54,6 +87,33 @@
     .sidebar {
         display: none !important;
     }
+
+    /* Expanded View Styles */
+    body.expanded-mode #job-detail-container {
+        width: 100%;
+        max-width: none;
+        padding: 0;
+    }
+
+    body.expanded-mode .info-card {
+        display: none;
+    }
+
+    body.expanded-mode .card:last-child {
+        border-radius: 0;
+        border: none;
+        box-shadow: none;
+        height: calc(100vh - 70px);
+        /* Adjust for navbar height */
+        display: flex;
+        flex-direction: column;
+    }
+
+    body.expanded-mode #processed-data-grid {
+        height: 100% !important;
+        border-radius: 0;
+        border: none;
+    }
 </style>
 {% endblock %}
 
@@ -68,9 +128,26 @@
         const elActions = document.getElementById("actions-bar");
         const elNotice = document.getElementById("perm-notice");
         const saveStatus = document.getElementById("save-status");
+        const expandBtn = document.getElementById("expandViewBtn");
+
+        // Add info-card class to the first card for easy toggling
+        document.querySelector('.card').classList.add('info-card');
 
         let hot;
         let currentJobData = null;
+
+        // Toggle Expand View
+        expandBtn.onclick = () => {
+            document.body.classList.toggle('expanded-mode');
+            const isExpanded = document.body.classList.contains('expanded-mode');
+
+            expandBtn.innerHTML = isExpanded ? '<i class="fas fa-compress"></i> Collapse' : '<i class="fas fa-expand"></i> Expand';
+
+            // Allow transition to finish before rendering
+            setTimeout(() => {
+                if (hot) hot.render();
+            }, 300);
+        };
 
         const apiCall = (url, options = {}) => fetch(url, {
             headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -86,6 +163,9 @@
                 elTitle.textContent = currentJobData.original_filename;
                 elSubtitle.textContent = `Period: ${getMonthName(currentJobData.attendance_month)} ${currentJobData.attendance_year} | Type: ${currentJobData.target_doctype}`;
                 elBadge.textContent = currentJobData.status;
+
+                // Handle error/partial success display
+                displayErrorSection(currentJobData);
 
                 // Handle interactive states where data should be ready
                 if (["AWAITING_VALIDATION", "COMPLETED", "SUBMISSION_FAILED"].includes(currentJobData.status)) {
@@ -142,18 +222,51 @@
             const tableData = Object.values(employeeData);
             const daysInMonth = new Date(currentJobData.attendance_year, currentJobData.attendance_month, 0).getDate();
 
+            const statusRenderer = function (instance, td, row, col, prop, value, cellProperties) {
+                Handsontable.renderers.DropdownRenderer.apply(this, arguments);
+
+                if (!value) {
+                    td.style.backgroundColor = '';
+                    td.style.color = '';
+                    return;
+                }
+
+                const valLower = String(value).toLowerCase();
+
+                if (valLower === 'present' || valLower === 'p') {
+                    td.style.backgroundColor = '#dcfce7'; // Light Green
+                    td.style.color = '#166534';
+                } else if (valLower === 'absent' || valLower === 'a') {
+                    td.style.backgroundColor = '#fee2e2'; // Light Red
+                    td.style.color = '#991b1b';
+                } else if (valLower === 'half day' || valLower === 'hd') {
+                    td.style.backgroundColor = '#e0f2fe'; // Light Blue
+                    td.style.color = '#075985';
+                } else if (valLower === 'on leave' || valLower === 'ol' || valLower.includes('leave')) {
+                    td.style.backgroundColor = '#fef9c3'; // Light Yellow
+                    td.style.color = '#854d0e';
+                } else if (valLower === 'wo' || valLower === 'weekly off') {
+                    td.style.backgroundColor = '#f3f4f6'; // Light Gray
+                    td.style.color = '#374151';
+                } else if (valLower === 'h' || valLower === 'holiday') {
+                    td.style.backgroundColor = '#fef3c7'; // Amber
+                    td.style.color = '#92400e';
+                }
+            };
+
             const columns = [
-                { data: 'Code', title: 'Emp Code', readOnly: true, width: 100 },
-                { data: 'Name', title: 'Full Name', readOnly: true, width: 200 }
+                { data: 'Code', title: 'Emp Code', readOnly: true, width: 120 },
+                { data: 'Name', title: 'Full Name', readOnly: true, width: 250 }
             ];
 
             for (let d = 1; d <= daysInMonth; d++) {
                 columns.push({
                     data: d.toString(),
                     title: d.toString(),
-                    width: 40,
+                    width: 60, // Slightly wider for readability
                     type: 'dropdown',
-                    source: ['', 'Present', 'Absent', 'On Leave', 'Half Day']
+                    source: ['', 'Present', 'Absent', 'On Leave', 'Half Day', 'WO', 'Holiday'],
+                    renderer: statusRenderer
                 });
             }
 
@@ -168,7 +281,8 @@
                 contextMenu: true,
                 search: true,
                 manualColumnResize: true,
-                stretchH: 'all',
+                autoColumnSize: true, // Auto adapt to content
+                fixedColumnsLeft: 2, // Keep name/code visible while scrolling
                 afterChange: (changes, source) => {
                     if (source === 'loadData') return;
                     saveStatus.textContent = "Unsaved changes detected";
@@ -243,6 +357,116 @@
 
         function getMonthName(m) {
             return new Intl.DateTimeFormat('en-US', { month: 'long' }).format(new Date(2000, m - 1));
+        }
+
+        // Display error section with details
+        function displayErrorSection(jobData) {
+            const errorSection = document.getElementById('error-section');
+            const errorTitle = document.getElementById('error-title');
+            const errorSummary = document.getElementById('error-summary');
+            const errorDetails = document.getElementById('error-details');
+            const partialSuccessSection = document.getElementById('partial-success-section');
+            const partialSuccessSummary = document.getElementById('partial-success-summary');
+            const toggleBtn = document.getElementById('toggle-errors');
+            
+            // Hide both sections initially
+            errorSection.style.display = 'none';
+            partialSuccessSection.style.display = 'none';
+            
+            if (!jobData.error_log) return;
+            
+            const errorLog = jobData.error_log;
+            const isPartialSuccess = errorLog.partial_success === true;
+            const hasSubmissionErrors = errorLog.step === 'submission' && errorLog.details;
+            
+            // Handle Partial Success
+            if (isPartialSuccess && jobData.status === 'COMPLETED') {
+                partialSuccessSection.style.display = 'block';
+                partialSuccessSummary.textContent = errorLog.summary || `Successfully uploaded ${errorLog.success_count} of ${errorLog.total_count} records.`;
+                
+                // Also show error details in expandable section
+                if (hasSubmissionErrors && errorLog.details.length > 0) {
+                    errorSection.style.display = 'block';
+                    errorTitle.textContent = 'Skipped Records (Duplicates)';
+                    errorSummary.textContent = 'The following records were already marked in ERPNext and were skipped:';
+                    renderErrorDetails(errorLog.details);
+                }
+                return;
+            }
+            
+            // Handle Full Failure
+            if (jobData.status === 'SUBMISSION_FAILED' || jobData.status === 'EXTRACTION_FAILED') {
+                errorSection.style.display = 'block';
+                
+                if (jobData.status === 'EXTRACTION_FAILED') {
+                    errorTitle.textContent = 'Processing Failed';
+                    errorSummary.textContent = errorLog.message || 'An error occurred during file processing.';
+                    errorDetails.innerHTML = `<p style="color: #7f1d1d;">${errorLog.message || 'Unknown error'}</p>`;
+                } else {
+                    // Submission failed
+                    errorTitle.textContent = 'Submission Failed';
+                    errorSummary.textContent = errorLog.summary || 'Some records failed to submit.';
+                    
+                    if (hasSubmissionErrors) {
+                        renderErrorDetails(errorLog.details);
+                    } else {
+                        errorDetails.innerHTML = `<p style="color: #7f1d1d;">${errorLog.message || 'Unknown error'}</p>`;
+                    }
+                }
+            }
+            
+            // Toggle button functionality
+            if (toggleBtn) {
+                toggleBtn.onclick = () => {
+                    const details = document.getElementById('error-details');
+                    const isHidden = details.style.display === 'none';
+                    details.style.display = isHidden ? 'block' : 'none';
+                    toggleBtn.innerHTML = isHidden ? '<i class="fas fa-chevron-up"></i>' : '<i class="fas fa-chevron-down"></i>';
+                };
+            }
+        }
+        
+        // Render error details as a table
+        function renderErrorDetails(details) {
+            const errorDetails = document.getElementById('error-details');
+            if (!details || !Array.isArray(details)) {
+                errorDetails.innerHTML = '<p>No error details available.</p>';
+                return;
+            }
+            
+            let html = '<table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">';
+            html += '<thead><tr style="border-bottom: 1px solid #fecaca;">';
+            html += '<th style="text-align: left; padding: 8px; color: #991b1b;">Employee</th>';
+            html += '<th style="text-align: left; padding: 8px; color: #991b1b;">Date</th>';
+            html += '<th style="text-align: left; padding: 8px; color: #991b1b;">Status</th>';
+            html += '<th style="text-align: left; padding: 8px; color: #991b1b;">Error</th>';
+            html += '</tr></thead><tbody>';
+            
+            details.forEach(err => {
+                const record = err.record_data || {};
+                const emp = record.employee || 'N/A';
+                const date = record.attendance_date || 'N/A';
+                const status = record.status || 'N/A';
+                const error = err.error || 'Unknown error';
+                
+                html += '<tr style="border-bottom: 1px solid #fecaca;">';
+                html += `<td style="padding: 8px;">${escapeHtml(emp)}</td>`;
+                html += `<td style="padding: 8px;">${escapeHtml(date)}</td>`;
+                html += `<td style="padding: 8px;">${escapeHtml(status)}</td>`;
+                html += `<td style="padding: 8px; color: #dc2626;">${escapeHtml(error)}</td>`;
+                html += '</tr>';
+            });
+            
+            html += '</tbody></table>';
+            errorDetails.innerHTML = html;
+        }
+        
+        // Helper to escape HTML
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = String(text);
+            return div.innerHTML;
         }
 
         loadJob();

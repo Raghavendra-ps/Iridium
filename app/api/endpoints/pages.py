@@ -93,6 +93,15 @@ async def home_page(request: Request):
     )
 
 
+@router.get("/history", response_class=HTMLResponse, include_in_schema=False)
+async def history_page(request: Request):
+    """Serves the archived jobs history page."""
+    return templates.TemplateResponse(
+        "job_history.html", 
+        {"request": request, "active_page": "history", "base_template": get_base_template(request)}
+    )
+
+
 @router.get("/settings", response_class=HTMLResponse, include_in_schema=False)
 async def settings_page(request: Request):
     """Serves the settings / user management page."""

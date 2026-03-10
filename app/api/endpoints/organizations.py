@@ -42,13 +42,17 @@ def list_organizations_for_dropdown(
     current_user: User = Depends(dependencies.get_current_active_user),
 ):
     """
-    List organizations for sheet maker / dropdowns. Superadmin: all orgs. Manager: only their org.
+    List organizations for sheet maker / dropdowns. 
+    Internal (Superadmin/Manager): all orgs. 
+    Client: only their org.
     Each item has id, name, source ('internal' | 'external').
     """
+    is_internal = current_user.role in ["superadmin", "manager"]
+    
     return organization_service.get_organizations_for_dropdown(
         db=db,
         user_organization_id=current_user.organization_id,
-        is_superadmin=(current_user.role == "superadmin"),
+        is_internal=is_internal,
     )
 
 

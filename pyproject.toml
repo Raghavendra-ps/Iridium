@@ -40,6 +40,9 @@ aioredis = "^2.0.1"
 pandas = "^2.0.0"
 openpyxl = "^3.1.2"
 
+# Fuzzy String Matching
+rapidfuzz = ">=3.0.0"
+
 # File Processing & OCR
 pytesseract = "^0.3.10"
 pillow = "^9.5.0"
