@@ -4,7 +4,7 @@
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
 [![Built with FastAPI](https://img.shields.io/badge/Built%20with-FastAPI-green.svg)](https://fastapi.tiangolo.com/)
 
-**Gretis DataPort** is a dynamic, template-driven ETL platform designed to automate the painful process of data extraction, validation, and submission to ERPNext. It transforms messy, inconsistent spreadsheets and documents into clean, structured attendance records through a user-friendly web interface—eliminating the need for manual data entry or custom scripts for every new file format.
+**Iridium** is a dynamic, template-driven ETL platform designed to automate the painful process of data extraction, validation, and submission to our ERP. It transforms messy, inconsistent spreadsheets and documents into clean, structured attendance records through a user-friendly web interface—eliminating the need for manual data entry or custom scripts for every new file format.
 
 ---
 
