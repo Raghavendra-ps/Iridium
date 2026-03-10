@@ -172,7 +172,7 @@ All configuration is managed through the `.env` file.
 
 ## License
 
-© 2025 Gretis India Private Limited. All rights reserved.
+© 2026 Gretis India Private Limited. All rights reserved.
 
 This software and its source code are proprietary and confidential.
 Unauthorized copying, distribution, use, modification, or access
